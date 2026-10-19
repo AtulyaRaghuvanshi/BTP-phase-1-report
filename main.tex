@@ -6,12 +6,22 @@
 \usepackage[nottoc]{tocbibind}
 \usepackage{longtable,booktabs,array,calc}
 \usepackage{float}
+\usepackage[tableposition=top]{caption}
+\usepackage{needspace}
 \usepackage{enumitem}
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{fontspec}
 \setmainfont{Latin Modern Roman}
+% Latin Modern has no glyphs for these characters; typeset them as math instead.
+\usepackage{newunicodechar}
+\newunicodechar{α}{\ensuremath{\alpha}}
+\newunicodechar{φ}{\ensuremath{\varphi}}
+\newunicodechar{ᵢ}{\textsubscript{\textit{i}}}
+\newunicodechar{ⱼ}{\textsubscript{\textit{j}}}
+\newunicodechar{∈}{\ensuremath{\in}}
+\newunicodechar{≈}{\ensuremath{\approx}}
 \usepackage[margin=1in]{geometry}
 \renewcommand{\chaptermark}[1]{\markboth{#1}{}}
 \renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
@@ -38,7 +48,6 @@
 
 \usepackage{graphicx}
 \usepackage{amsmath}
-\usepackage{cite}
 \usepackage{hyperref}
 
 
@@ -59,12 +68,12 @@
 % for reference and bibliography
 \usepackage[style=ieee, backend=biber, defernumbers=true]{biblatex}
 \addbibresource{bib.bib} % Your file name
-% Define the missing 'notcited' check
-\defbibcheck{notcited}{
-  \ifciteseen
-    {\skipentry}
-    {}
-}
+% Entries listed here go under "Bibliography" (further reading);
+% every other entry in bib.bib goes under "References".
+\DeclareBibliographyCategory{furtherreading}
+\addtocategory{furtherreading}{mirsky2021survey, tolosana2020survey, bach2015lrp,
+  biswas2026cdts, sundararajan2017ig,
+  pedregosa2011sklearn, paszke2019pytorch, wightman2019timm, ilharco2021openclip}
 
 %------------------------------------
 \begin{document}
@@ -135,7 +144,7 @@ requirement of {\bf Bachelor of Technology} in \textbf{Department of Computer Sc
 is an original work carried out by us under the supervision of
 \textbf{Dr. Koppala Guravaiah} and has not formed the basis for the award
 of any degree or diploma, in this or any other institution or
-university. I have sincerely tried to uphold the academic ethics
+university. We have sincerely tried to uphold the academic ethics
 and honesty. Whenever an external information or statement or
 result is used then, that have been duly acknowledged and cited.
 
@@ -209,7 +218,6 @@ award of any degree.
 \clearpage
 
 % --------------- Acknowledgement page -----------------------
-\pagenumbering{roman} \setcounter{page}{3}
 \begin{center}
 {\large{\bf{ACKNOWLEDGMENT}}}
 \end{center}
@@ -246,18 +254,15 @@ award of any degree.
 \chapter{Introduction}
 \label{ch:intro}
 
-\section{Background}
-\label{sec:background}
+The development of artificial intelligence has made possible the creation of high-quality images using GANs~\cite{goodfellow2014gan}, Diffusion models~\cite{ho2020ddpm, rombach2022ldm}, and many other deep learning techniques. While there are many positive applications of such technologies within the field of digital art, entertainment, and content creation, they also provide means of generating misleading images, forgery, misinformation, and fraud. Therefore, image forgery detection is an important topic of research.
 
-The development of artificial intelligence has made possible the creation of high-quality images using GANs, Diffusion models, and many other deep learning techniques. While there are many positive applications of such technologies within the field of digital art, entertainment, and content creation, they also provide means of generating misleading images, forgery, misinformation, and fraud. Therefore, image forgery detection is an important topic of research.
-
-The image forgery detection algorithm is based on machine learning and deep learning techniques, which enable evaluating whether an image is authentic in the presence of manipulations or fakes. The systems are capable of detecting discrepancies between the textures, frequency properties, distributions, noise features, and other aspects that emerge in the course of image creation. One of the shortcomings of the technique is the absence of model interpretability.
+The image forgery detection algorithm is based on machine learning and deep learning techniques, which enable evaluating whether an image is authentic in the presence of manipulations or fakes~\cite{wang2020cnn, ojha2023univfd, corvi2023diffusion, wang2023dire, yan2023deepfakebench}. The systems are capable of detecting discrepancies between the textures, frequency properties, distributions, noise features, and other aspects that emerge in the course of image creation~\cite{zhang2019autogan, frank2020frequency, durall2020upconv}. One of the shortcomings of the technique is the absence of model interpretability.
 
 The issue becomes challenging in the case of carrying out the evaluation of the reliability of predictions through the work of a human specialist. The journalists, forensics experts, fact-checkers and other users of the technology should be aware of which areas of the image played a role in the decision made by the algorithm. 
 
 Explainable Artificial Intelligence (XAI) addresses this challenge by providing visual explanations of how the areas of the picture were important for a model's prediction in the form of heatmaps.
 
-There are different techniques including Grad-CAM, LIME, RISE and gradient explanations that can be used to produce an explanation. However, the fact that an explanation seems visually intuitive does not guarantee its coincidence with the model's reasoning. This is why the evaluation of the quality of an explanation becomes vital.
+There are different techniques including Grad-CAM~\cite{selvaraju2017gradcam}, LIME~\cite{ribeiro2016lime}, RISE~\cite{petsiuk2018rise} and gradient explanations~\cite{simonyan2014saliency} that can be used to produce an explanation. However, the fact that an explanation seems visually intuitive does not guarantee its coincidence with the model's reasoning~\cite{adebayo2018sanity}. This is why the evaluation of the quality of an explanation becomes vital.
 
 
 \section{Motivation}
@@ -266,10 +271,10 @@ There are different techniques including Grad-CAM, LIME, RISE and gradient expla
 Performance of a deepfake detection system based on XAI includes two metrics: classifier's capability of distinguishing real images from deepfakes and quality of the explanation. A classifier can show good classification results while providing low-quality explanations that identify relevant regions in the image. Alternatively, the explanation may seem logical, but it will not show the influence of those regions on the classifier's decision-making process.
 
 
-The most popular technique for measuring the quality of explanation is faithfulness testing. Faithfulness testing aims at determining whether selected regions affect the classifier's decision. The most commonly used technique for this problem is the deletion-based perturbation technique. Under this method, the most important pixels are gradually deleted or altered, and the effect of this operation on the classifier's prediction is measured. If there is some important evidence in the selected regions, the confidence of the classifier's prediction is expected to decrease.
+The most popular technique for measuring the quality of explanation is faithfulness testing~\cite{hedstrom2023quantus}. Faithfulness testing aims at determining whether selected regions affect the classifier's decision. The most commonly used technique for this problem is the deletion-based perturbation technique~\cite{samek2017evaluating, petsiuk2018rise}. Under this method, the most important pixels are gradually deleted or altered, and the effect of this operation on the classifier's prediction is measured. If there is some important evidence in the selected regions, the confidence of the classifier's prediction is expected to decrease.
 
 
-But the above mentioned method poses another very significant problem. In order to remove those pixels from the image one needs something else to fill up the gap left by them. Some ways of filling the gaps might include replacing pixels with black pixels, grey regions, mean value images, adding noises to the image, blurring the picture and so forth. All these methods tend to add some kind of artefacts into the picture that could be considered abnormal edges, abnormal frequency spectrums, inconsistency of the texture and other similar things. In fact, they mimic the characteristics found out in deepfake images.
+But the above mentioned method poses another very significant problem. In order to remove those pixels from the image one needs something else to fill up the gap left by them. Some ways of filling the gaps might include replacing pixels with black pixels, grey regions, mean value images, adding noises to the image, blurring the picture and so forth~\cite{hooker2019roar, rong2022road}. All these methods tend to add some kind of artefacts into the picture that could be considered abnormal edges, abnormal frequency spectrums, inconsistency of the texture and other similar things. In fact, they mimic the characteristics found out in deepfake images~\cite{frank2020frequency, durall2020upconv}.
 
 
 Thus, the deepfake detection model would classify the distorted actual image as a deepfake since nothing was deleted from the image yet some distortions were added to it. So we see how a certain evaluation process changes its results.
@@ -286,18 +291,17 @@ First things first modern deepfake explainability systems consist of two modules
 
 
 Perturbation Techniques and Their Effectiveness:
-Metrics relying on the faithfulness concept presume that the removed pixels must somehow get filled up. The result depends upon the type of filling chosen hence the output changes not because of the explanation but due to the way how it has been implemented in place.
+Metrics relying on the faithfulness concept presume that the removed pixels must somehow get filled up~\cite{hooker2019roar, rong2022road}. The result depends upon the type of filling chosen hence the output changes not because of the explanation but due to the way how it has been implemented in place.
 
 Bias Introduced through Perturbation Technique
 Presence of blacks and noises could indicate manipulations conducted by the deepfake detector.
 
 Explanation Ranking Issues
-Even if we evaluate our technique according to its ranking through faithfulness measure the rankings will vary due to filling technique chosen.
+Even if we evaluate our technique according to its ranking through faithfulness measure the rankings will vary due to filling technique chosen~\cite{tomsett2020sanity, rong2022road}.
 
 Problem of Validation of the Effectiveness of Perturbations Techniques as Evaluation Metric
 
 There are many cases where a specific evaluation framework takes into account the use of the particular perturbation technique without checking the effect it has on the detector output on images and instead considers the result acquired automatically by taking things granted as sufficient proof which makes life difficult since the reason behind acquiring a particular result remains questionable. This becomes a very serious concern especially in terms of determining the reliability of our explanations whether they work or not.
-It is impossible for me to think about what I'm typing right now.
 
 Ignoring Generalization Across Generators for Creating Images and Explanations Reliability Assessment
 
@@ -325,7 +329,7 @@ Leakage test is performed for genuine images and some selected random areas of t
 Faithfulness of a specific explanation is compared with random deletion baseline using perturbations of the same kind and similar masks shape.
 
   \item Comparison of multiple perturbation methods:
-Several types of replacement methods are used, ranging from typical black, grey, noise, and blur to more complex nearest neighbor imputation and real pixel replacement with real images. It allows concluding that the results concerning the explanation quality are still valid in case of a change in the evaluation setup.
+Several types of replacement methods are used, ranging from typical black, grey, noise, and blur to more complex nearest neighbor imputation~\cite{rong2022road} and real pixel replacement with real images. It allows concluding that the results concerning the explanation quality are still valid in case of a change in the evaluation setup.
 
   \item Testing of the generators on several generators:
 Different generators are tested on artificial data generated by various generators. Different evaluation setups with various levels of diversity of the generators are tested for their influence on detectors and explanations.
@@ -358,21 +362,21 @@ Initial studies were mainly concerned with enhancing the accuracy and generaliza
 
 \begin{description}
 
-  \item 1. Xu et al. (2022) – Supervised Contrastive Learning for Generalizable and Explainable DeepFakes Detection. This study addresses contrastive learning to enhance the discrimination between true and false representations. It is a source of background information for designing detectors with good generalization capabilities.
+  \item 1. Xu et al. (2022)~\cite{xu2022supcon} – Supervised Contrastive Learning for Generalizable and Explainable DeepFakes Detection. This study addresses contrastive learning to enhance the discrimination between true and false representations. It is a source of background information for designing detectors with good generalization capabilities.
 
-  \item 2. Wang et al. (2022) – M2TR: Multi-modal Multi-scale Transformers for Deepfake Detection. The paper focuses on the analysis of transformer-based representations at various scales and modalities to capture the manipulative properties.
+  \item 2. Wang et al. (2022)~\cite{wang2022m2tr} – M2TR: Multi-modal Multi-scale Transformers for Deepfake Detection. The paper focuses on the analysis of transformer-based representations at various scales and modalities to capture the manipulative properties.
 
-  \item 3. Guarnera et al. (2022) – On the Exploitation of Deepfake Model Recognition. This paper focuses on identifying the traces of different generators as an approach to generator-specific artifacts research.
+  \item 3. Guarnera et al. (2022)~\cite{guarnera2022exploitation} – On the Exploitation of Deepfake Model Recognition. This paper focuses on identifying the traces of different generators as an approach to generator-specific artifacts research.
 
-  \item 4. Jia et al. (2022) – Model Attribution of Face-Swap Deepfake Videos. The study is devoted to the problem of attribution of manipulated videos to the model that created them.
+  \item 4. Jia et al. (2022)~\cite{jia2022attribution} – Model Attribution of Face-Swap Deepfake Videos. The study is devoted to the problem of attribution of manipulated videos to the model that created them.
 
-  \item 5. Lin et al. (2022) – Towards Generalizable DeepFake Face Forgery Detection with Semi-supervised Learning and Knowledge Distillation. The paper deals with semi-supervised learning and knowledge distillation for deepfake face forgery detection.
+  \item 5. Lin et al. (2022)~\cite{lin2022sclkd} – Towards Generalizable DeepFake Face Forgery Detection with Semi-supervised Learning and Knowledge Distillation. The paper deals with semi-supervised learning and knowledge distillation for deepfake face forgery detection.
 
-  \item 6. Song et al. (2022) – Face Forgery Detection via Symmetric Transformer. The study proposes a transformer-based approach to detecting face manipulation, which contributes to the design of new architectures for forgery detection.
+  \item 6. Song et al. (2022)~\cite{song2022symmetric} – Face Forgery Detection via Symmetric Transformer. The study proposes a transformer-based approach to detecting face manipulation, which contributes to the design of new architectures for forgery detection.
 
-  \item 7. Shen et al. (2022) – Identity-Referenced Deepfake Detection with Contrastive Learning. This approach involves the use of identity references and contrastive learning to distinguish real faces from manipulated faces.
+  \item 7. Shen et al. (2022)~\cite{shen2022identity} – Identity-Referenced Deepfake Detection with Contrastive Learning. This approach involves the use of identity references and contrastive learning to distinguish real faces from manipulated faces.
 
-   \item 8. Khan and Dang-Nguyen (2022) – Hybrid Transformer Network for Deepfake Detection. This work considers hybrid architectures based on transformers for detecting deepfake manipulation patterns.\\
+   \item 8. Khan and Dang-Nguyen (2022)~\cite{khan2022hybrid} – Hybrid Transformer Network for Deepfake Detection. This work considers hybrid architectures based on transformers for detecting deepfake manipulation patterns.\\
 \end{description}
 However, the above papers lay the theoretical foundation of deepfake detection and generalization. Nonetheless, it is not sufficient that detection is accurate since we need to be sure about the explanation of the evidences used by models.
 
@@ -384,19 +388,19 @@ In follow-up studies, methods for interpreting model predictions have been propo
 
 \begin{description}
 
-\item 9. Zhao et al. (2023) – ISTVT: Interpretable Spatial-Temporal Video Transformer for Deepfake Detection. ISTVT involves separating spatial and temporal information and generating relevance maps to interpret predictions. Nonetheless, visual relevance maps cannot guarantee explanation faithfulness per se.
+\item 9. Zhao et al. (2023)~\cite{zhao2023istvt} – ISTVT: Interpretable Spatial-Temporal Video Transformer for Deepfake Detection. ISTVT involves separating spatial and temporal information and generating relevance maps to interpret predictions. Nonetheless, visual relevance maps cannot guarantee explanation faithfulness per se.
 
-\item 10. Bai et al. (2023) – AUNet: Learning Relations Between Action Units for Face Forgery Detection. This method analyzes the relations between facial action units for improving the face forgery detection using structured facial data.
+\item 10. Bai et al. (2023)~\cite{bai2023aunet} – AUNet: Learning Relations Between Action Units for Face Forgery Detection. This method analyzes the relations between facial action units for improving the face forgery detection using structured facial data.
 
-\item 11. Shao et al. (2023) – Detecting and Grounding Multi-Modal Media Manipulation. The proposed DGM4/HAMMER framework includes multimodal reasoning and the localization of image manipulation regions and associated text content. While its grounding provides spatial support for predictions, the localization alone does not indicate the causal relation to prediction.
+\item 11. Shao et al. (2023)~\cite{shao2023dgm4} – Detecting and Grounding Multi-Modal Media Manipulation. The proposed DGM4/HAMMER framework includes multimodal reasoning and the localization of image manipulation regions and associated text content. While its grounding provides spatial support for predictions, the localization alone does not indicate the causal relation to prediction.
 
-\item 12. Guillaro et al. (2023) – TruFor: Harnessing All-Round Clues for Reliable Image Forgery Detection and Localization. TruFor utilizes RGB data and learned noise clues for image manipulation detection and localization. It can also generate reliable information about the images, even though localization accuracy and reliability calibration need additional evaluation.
+\item 12. Guillaro et al. (2023)~\cite{guillaro2023trufor} – TruFor: Leveraging All-Round Clues for Trustworthy Image Forgery Detection and Localization. TruFor utilizes RGB data and learned noise clues for image manipulation detection and localization. It can also generate reliable information about the images, even though localization accuracy and reliability calibration need additional evaluation.
 
-\item 13. Wang et al. (2023) – AltFreezing for More General Video Face Forgery Detection. The alternating training of the spatial and temporal networks of this model allows for better generalization; therefore, it focuses on the detection reliability and not on the explanation validation itself.
+\item 13. Wang et al. (2023)~\cite{wang2023altfreezing} – AltFreezing for More General Video Face Forgery Detection. The alternating training of the spatial and temporal networks of this model allows for better generalization; therefore, it focuses on the detection reliability and not on the explanation validation itself.
 
-\item 14. Khalid et al. (2023) – DFP-Net: An Explainable and Trustworthy Framework for Deepfake Detection using Interpretable Prototypes. The DFP-Net uses learned prototypes and Grad-CAM for providing interpretable evidence. Nevertheless, the influence of prototype-associated regions needs to be tested through faithfulness assessment directly.
+\item 14. Khalid et al. (2023)~\cite{khalid2023dfpnet} – DFP-Net: An Explainable and Trustworthy Framework for Detecting Deepfakes Using Interpretable Prototypes. The DFP-Net uses learned prototypes and Grad-CAM for providing interpretable evidence. Nevertheless, the influence of prototype-associated regions needs to be tested through faithfulness assessment directly.
 
-\item 15. Aghasanli et al. (2023) – Interpretable-Through-Prototypes Deepfake Detection for Diffusion Models. The paper discusses the prototype-based explanation approach for diffusion-generated images. It highlights the importance of prototype-based interpretations since their examination will help determine how accurate these explanations are.\\
+\item 15. Aghasanli et al. (2023)~\cite{aghasanli2023prototypes} – Interpretable-Through-Prototypes Deepfake Detection for Diffusion Models. The paper discusses the prototype-based explanation approach for diffusion-generated images. It highlights the importance of prototype-based interpretations since their examination will help determine how accurate these explanations are.\\
 
 \end{description}
 
@@ -406,17 +410,17 @@ In follow-up studies, methods for interpreting model predictions have been propo
 In 2024, explainability was enhanced by the use of semantic reasoning, identity comparison, prototypes, and human-centric evaluation.
 
 \begin{description}
-    \item 16. Haq et al. (2024) – Multimodal Neurosymbolic Approach for Explainable Deepfake Detection. In this case, an explanation is generated through the combination of audio-visual features and symbolic reasoning. Despite being rule-based and interpretable, the approach depends on rules and multimodal input.
+    \item 16. Haq et al. (2024)~\cite{haq2024neurosymbolic} – Multimodal Neurosymbolic Approach for Explainable Deepfake Detection. In this case, an explanation is generated through the combination of audio-visual features and symbolic reasoning. Despite being rule-based and interpretable, the approach depends on rules and multimodal input.
 
-    \item 17. Yu et al. (2024) – Diff-ID: An Explainable Identity Difference Quantification Framework for DeepFake Detection. The method quantifies identity difference between a test face image and a legitimate reference. In this case, a reference-based method limits the application of the technique.
+    \item 17. Yu et al. (2024)~\cite{yu2024diffid} – Diff-ID: An Explainable Identity Difference Quantification Framework for DeepFake Detection. The method quantifies identity difference between a test face image and a legitimate reference. In this case, a reference-based method limits the application of the technique.
 
-    \item 18. Khalid et al. (2024) — ExplaNET: A Descriptive Framework for Detecting Deepfakes With Interpretable Prototypes. ExplaNET merges prototype learning and Grad-CAM into an interpretable description of the behavior of detectors. Direct quantification of prototype faithfulness stays a relevant research topic.
-
-
-    \item 19. Tsigos et al. (2024) — Towards Quantitative Evaluation of Explainable AI Methods for Deepfake Detection. This paper performs a quantitative comparison of explanation approaches based on perturbation-based evaluation. It shows that LIME is the most powerful approach in the setting considered, and SOBOL and SHAP are close competitors. However, the paper's evaluation is performed in a single detector/dataset setting, and replacement strategy effects need to be studied further.
+    \item 18. Khalid et al. (2024)~\cite{khalid2024explanet} — ExplaNET: A Descriptive Framework for Detecting Deepfakes With Interpretable Prototypes. ExplaNET merges prototype learning and Grad-CAM into an interpretable description of the behavior of detectors. Direct quantification of prototype faithfulness stays a relevant research topic.
 
 
-    \item 20. Yang et al. (2024) — SNIPPET: A Framework for Subjective Evaluation of Visual Explanations Applied to DeepFake Detection. SNIPPET applies human assessment and evaluation through comparison with automatic measures for evaluation of visual explanations. It illustrates the benefits of human-centered approach to explanation evaluation, but perceived usefulness and faithfulness assess different qualities of explanations.
+    \item 19. Tsigos et al. (2024)~\cite{tsigos2024towards} — Towards Quantitative Evaluation of Explainable AI Methods for Deepfake Detection. This paper performs a quantitative comparison of explanation approaches based on perturbation-based evaluation. It shows that LIME is the most powerful approach in the setting considered, and SOBOL and SHAP are close competitors. However, the paper's evaluation is performed in a single detector/dataset setting, and replacement strategy effects need to be studied further.
+
+
+    \item 20. Yang et al. (2024)~\cite{yang2024snippet} — SNIPPET: A Framework for Subjective Evaluation of Visual Explanations Applied to DeepFake Detection. SNIPPET applies human assessment and evaluation through comparison with automatic measures for evaluation of visual explanations. It illustrates the benefits of human-centered approach to explanation evaluation, but perceived usefulness and faithfulness assess different qualities of explanations.
 
  
 \end{description}
@@ -428,15 +432,15 @@ Some recent research works move explainability from heatmap and prototype-based 
 
 \begin{description}
      
-  \item 21. In their research of vision-language models' rethinking for the purpose of face forensics, Guo et al. (2025) suggest M2F2-Det that incorporates vision-language embeddings and textual justifications of the forgery face detection process. Among key issues of this research are the problem of the generated explanation's verification as related to the actual usage of the visual data.
+  \item 21. In their research of vision-language models' rethinking for the purpose of face forensics, Guo et al. (2025)~\cite{guo2025m2f2det} suggest M2F2-Det that incorporates vision-language embeddings and textual justifications of the forgery face detection process. Among key issues of this research are the problem of the generated explanation's verification as related to the actual usage of the visual data.
   
-  \item 22. In their research of general visual-linguistic forgery face detection, Sun et al. (2025) propose FFTG, which combines forgery region information with language generation to describe manipulated areas and features of these images. The method faces difficulties associated with its reliance on ground-truth forgery region mask annotation in case such information is missing.
+  \item 22. In their research of general visual-linguistic forgery face detection, Sun et al. (2025)~\cite{sun2025fftg} propose FFTG, which combines forgery region information with language generation to describe manipulated areas and features of these images. The method faces difficulties associated with its reliance on ground-truth forgery region mask annotation in case such information is missing.
 
-  \item 23. In the research AIGI-Holmes: Towards Explainable and Generalizable AI-Generated Image Detection via Multimodal Large Language Models, Zhou et al. (2025) explore multimodal language models in terms of their capability of providing explanations for the detection of AI-generated images, moving the field of explainability beyond face swap videos.
+  \item 23. In the research AIGI-Holmes: Towards Explainable and Generalizable AI-Generated Image Detection via Multimodal Large Language Models, Zhou et al. (2025)~\cite{zhou2025aigiholmes} explore multimodal language models in terms of their capability of providing explanations for the detection of AI-generated images, moving the field of explainability beyond face swap videos.
 
-  \item 24. Li et al. (2025) propose RAIDX: A Retrieval-Augmented Generation and GRPO Reinforcement Learning Framework for Explainable Deepfake Detection. RAIDX involves generation augmented by the process of retrieval and reinforcement learning resulting in textual explanations and saliency map generation. It is essential
+  \item 24. Li et al. (2025)~\cite{li2025raidx} propose RAIDX: A Retrieval-Augmented Generation and GRPO Reinforcement Learning Framework for Explainable Deepfake Detection. RAIDX involves generation augmented by the process of retrieval and reinforcement learning resulting in textual explanations and saliency map generation. It is essential, however, to verify that the generated textual explanations and saliency maps actually reflect the evidence on which the detector relies.
 
- \item 25. Kong et al. (2025) – MoE-FFD: Mixture of Experts for Generalized and Parameter-Efficient Face Forgery Detection. MoE-FFD utilizes a mixture-of-experts approach to improve generalization and parameter efficiency. While the expert routing could suggest specialization, its interpretability is to be demonstrated.
+ \item 25. Kong et al. (2026)~\cite{kong2026moeffd} – MoE-FFD: Mixture of Experts for Generalized and Parameter-Efficient Face Forgery Detection. MoE-FFD utilizes a mixture-of-experts approach to improve generalization and parameter efficiency. While the expert routing could suggest specialization, its interpretability is to be demonstrated.
 
         
 \end{description}
@@ -447,7 +451,7 @@ Some recent research works move explainability from heatmap and prototype-based 
 
 Three main trends can be identified from the surveyed literature: advancements in deepfake detection, interpretable representations, and quantified or human-centric evaluation of the explanation. Still, those trends do not provide an answer to the question of how to prove that an explanation truly conveys the evidence behind the prediction.
 
-Heatmaps might look convincing without being faithful. Prototype approaches need to have the regions highlighted confirmed, while language explanations should be compared with the visual evidence on which the predictor relies. On the other hand, deletion-based faithfulness metrics, while being more objective, are still dependent on the perturbation technique used.
+Heatmaps might look convincing without being faithful~\cite{adebayo2018sanity}. Prototype approaches need to have the regions highlighted confirmed, while language explanations should be compared with the visual evidence on which the predictor relies. On the other hand, deletion-based faithfulness metrics, while being more objective, are still dependent on the perturbation technique used~\cite{hooker2019roar, rong2022road}.
 
 A critical limitation here is the fact that any perturbation of real images could influence the detector’s output. Artificial edges, noise, and texture changes could result in some additional signals impacting the value of the faithfulness measure. Hence, the evaluation of explanation quality should include controls aimed at estimating the effect of perturbation separately from the explanation.
 
@@ -462,7 +466,7 @@ Based on the reviewed literature, the following research gaps motivate the sugge
 
     \item  Lack of control-based evaluation: Explanation-based deletion should be compared to random deletion with similar masks and approaches to replacements.
 
-    \item Method rankings inconsistency: Explanation methods should be tested with several perturbation approaches to see how their ranking order is stable.
+    \item Method rankings inconsistency: Explanation methods should be tested with several perturbation approaches to see how their ranking order is stable~\cite{tomsett2020sanity}.
 
     \item Incomplete evaluation of reliability: Besides faithfulness, leakage should be considered, as well as detection results, statistical significance, effect sizes and correlation in rankings.
 
@@ -492,12 +496,14 @@ In this paper, we add to the current literature by investigating if faithfulness
 
 %------ references and bibliography ------------
 
-% 1. Cited references (Items you used \cite{} for)
-\printbibliography[title={References}, heading=bibintoc]
+% Include every bib.bib entry; cited works are numbered first, in order of citation.
+\nocite{*}
 
-% 2. Further reading (Items you only used \nocite{} for)
-\nocite{golub, gerla, m1, chang} % Your specific keys
-\printbibliography[check=notcited, title={Bibliography}, heading=bibintoc]
+% 1. References: everything except the further-reading category
+\printbibliography[notcategory=furtherreading, title={References}, heading=bibintoc]
+
+% 2. Bibliography: further reading (numbering continues from References)
+\printbibliography[category=furtherreading, title={Bibliography}, heading=bibintoc]
 
 
 \end{document}

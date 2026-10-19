@@ -1,4 +1,5 @@
 \chapter{Proposed Methodology}
+\label{ch:methodology}
 
 % Original chapter title retained in chapter heading
 
@@ -47,7 +48,7 @@ remains the same. This helps to evaluate cross-generator performance and
 faithfulness of explanations under similar models. However, the main
 axes still differ: detector backbones include ResNet-50, ViT-B/16, and
 CLIP ViT-B/16; generator or manipulation families include GAN,
-diffusion, autoregressive, inpainting, face-swap, rendered, etc.
+diffusion, autoregressive~\cite{esser2021taming}, inpainting~\cite{suvorov2022lama}, face-swap, rendered~\cite{wood2021fake}, etc.
 
 \section{\texorpdfstring{\textbf{System
 architecture}}{System architecture}}\label{system-architecture}
@@ -61,17 +62,12 @@ the detector wrapper using the backbone selected. This is imperative
 because each perturbation operator works on the raw pixel space before
 normalization of the image by the model.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image2.png}
-    \caption{Architecture of the proposed experimental pipeline. The leakage branch is evaluated on authentic images without explanation maps; the faithfulness branch compares salient and random deletion using a shared operator.}
+    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/methodology_architecture.png}
+    \caption{Architecture of the proposed experimental pipeline. (The leakage branch is evaluated on authentic images without explanation maps; the faithfulness branch compares salient and random deletion using a shared operator.)}
     \label{fig:experimental-pipeline}
 \end{figure}
-
-\emph{Figure 3.1. Architecture of the proposed experimental pipeline.
-The leakage branch is evaluated on authentic images without explanation
-maps; the faithfulness branch compares salient and random deletion using
-a shared operator.}
 
 The frozen feature extraction layer implements three main backbone
 architectures: ResNet-50 (CNN), ViT-B/16 (vision transformer), and CLIP
@@ -91,12 +87,35 @@ deletion/random control test. Finally, the analysis layer logs tabular
 results and computes operator-wise comparisons, ranking statistics,
 detection transfer matrices, and family diversity summaries.
 
-\begin{figure}[htbp]
+\subsection{Architectural components}\label{architectural-components}
+
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image20.png}
-    \caption{System architecture diagram.}
-    \label{fig:image20}
-\end{figure}
+    \caption{Architectural components of the system.}
+    \label{tab:architectural-components}
+    \small
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}@{}}
+        \toprule
+        \textbf{Component} & \textbf{Role in the system} & \textbf{Methodological reason} \\
+        \midrule
+        Dataset manifest & Unifies data sources and records label, generator, family, split and optional ground-truth mask. & Ensures every experiment uses the same metadata and supports per-family analysis. \\
+        \addlinespace
+        Frozen backbone & Extracts image features using ResNet-50, ViT-B/16 or CLIP ViT-B/16. & Holds representation weights constant and makes architecture a controlled comparison axis. \\
+        \addlinespace
+        Logistic-regression probe & Maps L2-normalised features to real/fake logits. & Keeps classifier capacity and regularisation comparable while training-set family composition changes. \\
+        \addlinespace
+        Explanation module & Produces pixel-level saliency maps for the fake class. & Allows different explanation families to be evaluated through a common interface. \\
+        \addlinespace
+        Perturbation-operator module & Replaces masked pixels using one explicitly selected fill rule. & Makes the fill rule a visible experimental variable rather than an implicit metric default. \\
+        \addlinespace
+        Leakage metric module & Scores authentic images with random masks and reports leakage summaries. & Tests the measuring procedure independently of saliency. \\
+        \addlinespace
+        Faithfulness metric module & Computes salient and random deletion curves, then their AUC difference. & Discounts the average effect of the operator with a paired random control. \\
+        \addlinespace
+        Analysis and persistence & Stores CSV/JSON summaries, curves, figures, checkpoints and run configuration. & Supports auditing, resumability and reproduction of comparisons. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \section{\texorpdfstring{\textbf{Data preparation and split
 strategy}}{Data preparation and split strategy}}\label{data-preparation-and-split-strategy}
@@ -144,23 +163,25 @@ probe}}{Frozen-feature linear probe}}\label{frozen-feature-linear-probe}
 In case of an input image x, the feature vector φ(x) is extracted using
 the pretrained backbone φ. The backbone parameters are not updated. Each
 feature vector is normalized using L2 normalization before training a
-logistic regression classifier. The logistic regression classifier
+logistic regression classifier~\cite{alain2017probes}. The logistic regression classifier
 learns a linear decision boundary that separates the real class from the
 fake class. The output of the classifier is converted into the
 probability of the fake class, i.e., P(fake \textbar{} x). In the code,
 the binary scikit-learn probe is implemented using a two-logit head.
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.88\textwidth,height=0.75in,keepaspectratio]{media/image12.png}
-    \caption{Frozen-feature linear probe illustration.}
-    \label{fig:image12}
-\end{figure}
+\begin{align}
+    z(x) &= \frac{\varphi(x)}{\lVert \varphi(x) \rVert_2 + \varepsilon} \label{eq:probe-feature} \\
+    P(\text{fake} \mid x) &= \sigma\!\left(w^{\top} z(x) + b\right) \label{eq:probe-probability}
+\end{align}
 
-In this case, φ stands for the frozen image encoder, z stands for the
-normalized feature representation, w and b stand for the
-logistic-regression parameters, ε stands for a tiny numerical
-stabilizer, and σ is the sigmoid function. The equation is chosen for
+In this case, $x$ is the input image, $\varphi$ stands for the frozen
+image encoder and $\varphi(x)$ for its feature vector, $\lVert \cdot
+\rVert_2$ is the L2 norm, $z(x)$ stands for the normalized feature
+representation, $w$ and $b$ stand for the logistic-regression weight
+vector and bias ($w^{\top}$ being the transpose of $w$), $\varepsilon$
+stands for a tiny numerical stabilizer, $\sigma$ is the sigmoid
+function, and $P(\text{fake} \mid x)$ is the predicted probability that
+$x$ is fake. The equation is chosen for
 experimentation purposes and not on the basis of the assertion that a
 linear head is the best possible detector. It ensures consistency in the
 interface, feature caching, cheap training of the head, and
@@ -179,12 +200,26 @@ mixed probe, is trained on all fake families and acts as a reference
 detector. In order to make a fair comparison, the backbone weights, the
 head architecture, and regularisation are kept constant, and the same
 pool of real images is
-used.\begin{figure}[htbp]
+used.
+
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image21.png}
-    \caption{Training configuration illustration.}
-    \label{fig:image21}
-\end{figure}
+    \caption{Probe training configurations.}
+    \label{tab:training-configurations}
+    \small
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.26\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}@{}}
+        \toprule
+        \textbf{Probe configuration} & \textbf{Training data} & \textbf{Interpretation} \\
+        \midrule
+        Single-family & Real images plus fake images from one family A. & Measures transfer when the detector has learned from a narrow synthesis family. \\
+        \addlinespace
+        Leave-one-family-out (LOO) & Real images plus fake images from all included families except held-out family F. & Measures generalisation to a family not represented among the fake training examples. \\
+        \addlinespace
+        Mixed & Real images plus fake images from all included families. & Reference performance when the evaluated families are represented during training; not an unseen-family test. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 The
 method uses L2 regularized logistic regression with a value of C=1 and
 balanced class weights, and up to 2,000 iterations with L-BFGS
@@ -203,16 +238,41 @@ treatment. This is implemented by taking the operator as a parameter and
 applying it to the mask region while keeping all other pixels that are
 not in the mask. The operators are tested and not assumed to be neutral.
 There are five operators used to introduce artifacts while three are
-neutral.\begin{figure}[htbp]
+neutral.
+
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image16.png}
-    \caption{Perturbation operators illustration.}
-    \label{fig:image16}
-\end{figure}``Injecting''
+    \caption{Perturbation operators.}
+    \label{tab:perturbation-operators}
+    \small
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}@{}}
+        \toprule
+        \textbf{Operator} & \textbf{Group / hypothesis} & \textbf{Replacement used for masked pixels} & \textbf{Potential confound under forensic detection} \\
+        \midrule
+        zero & Conventional / injecting & Black pixels. & Strong mask boundaries and an unnatural constant region. \\
+        \addlinespace
+        gray & Conventional / injecting & Constant mid-grey value. & Flat colour and missing local image texture. \\
+        \addlinespace
+        mean & Conventional / injecting & Per-channel mean colour of the image. & Low spatial variation within the fill. \\
+        \addlinespace
+        uniform\_noise & Conventional / injecting & Independent uniform random values. & Unnatural noise statistics and a flat spectrum. \\
+        \addlinespace
+        gaussian\_blur & Conventional / injecting & Blurred version of the image. & Suppression of high-frequency content. \\
+        \addlinespace
+        road\_linear & Neutrality candidate & Noisy linear imputation from surviving neighbours. & Imputation may be overly smooth or texture-poor. \\
+        \addlinespace
+        spectral\_match & Neutrality candidate & Surrogate noise based on the image power spectrum with randomised phase and moment matching. & Global matching may not preserve local or spatial statistics. \\
+        \addlinespace
+        real\_transplant & Neutrality candidate & Co-located pixels from another authentic image, drawn from a donor bank. & Mask-boundary seams and donor/content mismatch remain possible. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+``Injecting''
 and ``neutrality candidate'' are the names of the hypothesis rather than
 the final order. A candidate is considered to be less leaky only insofar
 as the null-test results of the tested detector confirm that. The
-approach on purpose does not use generative inpainting as a neutral
+approach on purpose does not use generative inpainting~\cite{chang2019counterfactual, agarwal2020removing} as a neutral
 baseline. If the generator is learned, it may add synthesis artifacts
 into the hole, and thus confuse the testing of a detector that is
 trained to detect synthetics.
@@ -252,23 +312,40 @@ included in it.
 \subsection{\texorpdfstring{\textbf{Quantities
 recorded}}{Quantities recorded}}\label{quantities-recorded}
 
-\textbf{LΔ(O) = ∫₀¹ {[} Eᵢ P(fake \textbar{} x̃ᵢ,α,O) − Eᵢ P(fake
-\textbar{} xᵢ) {]} dα}
+\begin{equation}
+    L_{\Delta}(O) = \int_{0}^{1} \Big[ \mathbb{E}_i\, P(\text{fake} \mid \tilde{x}_{i,\alpha,O}) - \mathbb{E}_i\, P(\text{fake} \mid x_i) \Big] \, d\alpha
+    \label{eq:leakage}
+\end{equation}
 
-In this formula, xᵢ stands for the real image, x̃ᵢ,α,O stands for its
-modified form in which a fraction of α pixels is covered and then filled
-using operator O, and the expected value is calculated for the real
-images sample. The collection includes the summaries of leakages, such
+In this formula, $x_i$ stands for the $i$-th real image,
+$\tilde{x}_{i,\alpha,O}$ stands for its modified form in which a
+fraction $\alpha$ of pixels is covered and then filled using operator
+$O$, $P(\text{fake} \mid \cdot)$ is the detector's predicted probability
+of the fake class, and the expected value $\mathbb{E}_i$ is calculated
+for the real images sample. The collection includes the summaries of leakages, such
 as the area under the fake-probability curve, the area under the change
 from the mean curve, the slope in the small-mask regime, and the flip
 rate. All these parameters provide the description of the complementary
 sensitivity
-aspects.\begin{figure}[htbp]
+aspects.
+
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image7.png}
-    \caption{Leakage null-test results.}
-    \label{fig:image7}
-\end{figure}
+    \caption{Quantities recorded in the leakage null test.}
+    \label{tab:leakage-quantities}
+    \small
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}@{}}
+        \toprule
+        \textbf{Output} & \textbf{Definition / interpretation} & \textbf{Expected interpretation} \\
+        \midrule
+        Leakage $\Delta$AUC / leakage integral & Normalised integral of the change in P(fake) over the masking fractions. & Values close to zero indicate little average score change; a positive value indicates systematic movement toward fake. \\
+        \addlinespace
+        Initial leakage slope & Least-squares slope of mean score change in the early masked-area regime (configured at $\alpha \leq 0.2$). & A steep positive slope indicates that even small perturbations create a fake signal. \\
+        \addlinespace
+        Flip rate & Fraction of initially real-class images whose perturbed curve crosses the fake decision threshold. & Summarises image-level decision changes; interpretation depends on baseline scores and threshold. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 Leakage is documented for each combination of detector and operator and
 can and should also be stratified with respect to training set up and
@@ -279,7 +356,7 @@ fill.
 
 \section{\texorpdfstring{\textbf{Algorithm II: leakage-corrected
 faithfulness
-(ΔAUC)}}{3.7 Algorithm II: leakage-corrected faithfulness (ΔAUC)}}\label{algorithm-ii-leakage-corrected-faithfulness-ux3b4auc}
+(ΔAUC)}}{Algorithm II: leakage-corrected faithfulness (ΔAUC)}}\label{algorithm-ii-leakage-corrected-faithfulness-ux3b4auc}
 
 \subsection{\texorpdfstring{\textbf{Saliency-ranked
 deletion}}{Saliency-ranked deletion}}\label{saliency-ranked-deletion}
@@ -291,12 +368,22 @@ binary mask Mα(s) using the top ranked pixels. An operator O fills the
 pixels inside the mask, whereas those outside the mask stay the same.
 The detector outputs P(fake) for the perturbed image. The deletion plot
 is then calculated using the trapezoidal
-rule.\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.88\textwidth,height=0.75in,keepaspectratio]{media/image15.png}
-    \caption{Saliency-ranked deletion illustration.}
-    \label{fig:image15}
-\end{figure}
+rule.
+
+\begin{align}
+    \tilde{x}_{i,\alpha} &= (1 - M_{\alpha}) \odot x_i + M_{\alpha} \odot O(x_i, M_{\alpha}) \label{eq:perturbed-image} \\
+    A_i(s, O) &= \int_{0}^{1} P(\text{fake} \mid \tilde{x}_{i,\alpha}) \, d\alpha \label{eq:deletion-auc}
+\end{align}
+
+\noindent where $x_i$ is the $i$-th synthetic test image, $s$ is its
+saliency map, $M_{\alpha} = M_{\alpha}(s)$ is the binary mask that
+selects the top-ranked fraction $\alpha$ of pixels (1 inside the mask
+and 0 outside), $\odot$ denotes element-wise multiplication,
+$O(x_i, M_{\alpha})$ is the fill produced by operator $O$ for the masked
+region, $\tilde{x}_{i,\alpha}$ is the resulting perturbed image,
+$P(\text{fake} \mid \tilde{x}_{i,\alpha})$ is the detector's predicted
+probability of the fake class for the perturbed image, and $A_i(s, O)$
+is the deletion AUC of image $i$ for saliency map $s$ and operator $O$.
 
 A low raw deletion AUC value implies a quick reduction of the fake value
 upon deleting salient pixels. This, however, is true only in the case
@@ -314,7 +401,15 @@ process as the null test. Where feasible, both arms use the same random
 seeds and donor sequence to create variations only due to salient pixel
 deletion ranking.
 
-ΔAUC = (1/N) Σᵢ {[} Aᵢ(random, O) − Aᵢ(salient, O) {]}
+\begin{equation}
+    \Delta\mathrm{AUC} = \frac{1}{N} \sum_{i=1}^{N} \Big[ A_i(\text{random}, O) - A_i(\text{salient}, O) \Big]
+    \label{eq:delta-auc}
+\end{equation}
+
+\noindent where $N$ is the number of test images, $A_i(\text{random}, O)$
+is the deletion AUC of image $i$ under the random-deletion control, and
+$A_i(\text{salient}, O)$ is its deletion AUC under saliency-ranked
+deletion, both computed with the same fill operator $O$.
 
 Sign is important because positive value ΔAUC \textgreater{} 0 shows
 that deletion of salient pixels affects the model's fake probability
@@ -335,6 +430,7 @@ stability of conclusion for different operators.
 
 \subsection{\texorpdfstring{\textbf{Pseudocode}}{Pseudocode}}\label{pseudocode}
 
+\needspace{14\baselineskip}
 \textbf{Algorithm 1. Leakage null test}
 
 \begin{longtable}[]{@{}
@@ -343,6 +439,11 @@ stability of conclusion for different operators.
 \begin{minipage}[b]{\linewidth}\raggedright
 Input: trained detector D; authentic test images R; operator set O;
 masking fractions A; repeat count T.
+
+Output: one leakage summary per detector--operator condition (and
+family/configuration where evaluated).
+
+Process:
 
 For each detector and operator Oⱼ:
 
@@ -358,16 +459,15 @@ repeats and images.
 
 5. Calculate leakage integral / ΔAUC, early slope, and threshold flip
 rate.
-
-Output: one leakage summary per detector--operator condition (and
-family/configuration where evaluated).
 \end{minipage} \\
 \midrule\noalign{}
 \endhead
 \bottomrule\noalign{}
 \endlastfoot
 \end{longtable}
+\addtocounter{table}{-1} % pseudocode box, not a numbered table
 
+\needspace{14\baselineskip}
 \textbf{Algorithm 2. Leakage-corrected faithfulness}
 
 \begin{longtable}[]{@{}
@@ -376,6 +476,11 @@ family/configuration where evaluated).
 \begin{minipage}[b]{\linewidth}\raggedright
 Input: detector D; fake test images X; explanation method E; operator O;
 fractions A.
+
+Output: mean ΔAUC with its uncertainty, paired test and effect size per
+explanation method--operator--detector--family condition.
+
+Process:
 
 For each image xᵢ ∈ X:
 
@@ -403,6 +508,7 @@ generator-family test sets.
 \bottomrule\noalign{}
 \endlastfoot
 \end{longtable}
+\addtocounter{table}{-1} % pseudocode box, not a numbered table
 
 \section{\texorpdfstring{\textbf{Controlled cross-generator
 experiment}}{Controlled cross-generator experiment}}\label{controlled-cross-generator-experiment}
@@ -416,9 +522,16 @@ single-family probe is trained on an alternative family A, whereas the
 LOO probe is trained on all other included families except target family
 F. Both probes are tested on the same target-family test images.
 
-\textbf{δₘ(A,F) = m(LOO\_F on F) − m(single\_A on F)},
+\begin{equation}
+    \delta_m(A, F) = m(\mathrm{LOO}_F \text{ on } F) - m(\mathrm{single}_A \text{ on } F),
+    \label{eq:diversity-delta}
+\end{equation}
 
-where m is either detection ROC-AUC or faithfulness ΔAUC. A positive δ
+\noindent where $m$ is either detection ROC-AUC or faithfulness
+$\Delta$AUC, $F$ is the held-out target family, $A$ is the alternative
+family used to train the single-family probe, $\mathrm{LOO}_F$ is the
+leave-one-family-out probe trained on all included families except $F$,
+and $\mathrm{single}_A$ is the single-family probe trained on $A$. A positive $\delta$
 for detection means that the more diverse LOO training set helps to
 detect the test family; for faithfulness, interpretation follows from
 the ΔAUC convention. Both results are compared because improved
@@ -443,77 +556,41 @@ then compares saliency-ranked deletion with a control that uses the same
 operator. Each design decision is linked to a specific confound or
 feasibility requirement.
 
-\begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.5000}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.5000}}@{}}
-\toprule\noalign{}
-\begin{minipage}[b]{\linewidth}\raggedright
-\textbf{Design choice}
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-\textbf{Reason for selection}
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Leakage null test without an explainer
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Isolates whether a fill operator alone changes the fake score. This
-distinguishes instrumentation bias from saliency-dependent effects.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Explicit operator parameter
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Allows identical experiments to be repeated with black, grey, blur,
-noise, ROAD-style imputation, spectral matching and real-image
-transplantation.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Random-deletion control and ΔAUC
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Controls for the average effect of the selected fill and mask schedule,
-giving a baseline for chance-level pixel rankings.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Frozen backbones and linear probes
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Keeps representation weights constant and gives probes identical head
-capacity across the family-diversity intervention.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Multiple backbone families
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Tests whether conclusions depend on CNN, standard ViT or CLIP visual
-representations instead of assuming one detector is representative.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Generator-family split and held-out evaluation
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Measures generalisation across synthesis paradigms rather than only
-random image-level generalisation within seen sources.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Operator-wise ranking analysis
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Directly tests whether a statement such as ``method A is most faithful''
-survives a change in the evaluation procedure.
-\end{minipage} \\
-\begin{minipage}[b]{\linewidth}\raggedright
-Seeded, resumable computations
-\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
-Supports reproducibility and enables large evaluation grids to continue
-after interrupted runs without silently mixing settings.
-\end{minipage} \\
-\midrule\noalign{}
-\endhead
-\bottomrule\noalign{}
-\endlastfoot
-\end{longtable}
+\begin{table}[H]
+    \centering
+    \caption{Design choices of the proposed algorithm and the reasons for their selection.}
+    \label{tab:design-choices}
+    \small
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.36\textwidth}>{\raggedright\arraybackslash}p{0.58\textwidth}@{}}
+        \toprule
+        \textbf{Design choice} & \textbf{Reason for selection} \\
+        \midrule
+        Leakage null test without an explainer & Isolates whether a fill operator alone changes the fake score. This distinguishes instrumentation bias from saliency-dependent effects. \\
+        \addlinespace
+        Explicit operator parameter & Allows identical experiments to be repeated with black, grey, blur, noise, ROAD-style imputation~\cite{rong2022road}, spectral matching and real-image transplantation. \\
+        \addlinespace
+        Random-deletion control and $\Delta$AUC & Controls for the average effect of the selected fill and mask schedule, giving a baseline for chance-level pixel rankings. \\
+        \addlinespace
+        Frozen backbones and linear probes & Keeps representation weights constant and gives probes identical head capacity across the family-diversity intervention. \\
+        \addlinespace
+        Multiple backbone families & Tests whether conclusions depend on CNN, standard ViT or CLIP visual representations instead of assuming one detector is representative. \\
+        \addlinespace
+        Generator-family split and held-out evaluation & Measures generalisation across synthesis paradigms rather than only random image-level generalisation within seen sources. \\
+        \addlinespace
+        Operator-wise ranking analysis & Directly tests whether a statement such as ``method A is most faithful'' survives a change in the evaluation procedure. \\
+        \addlinespace
+        Seeded, resumable computations & Supports reproducibility and enables large evaluation grids to continue after interrupted runs without silently mixing settings. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 The deletion process using one fill operator will be simpler, but it
 cannot determine whether the operator creates an artificial signal on
 its own. Retraining the entire detector for each explanation technique,
-as seen in ROAR-like approaches, solves some out-of-distribution
+as seen in ROAR-like approaches~\cite{hooker2019roar}, solves some out-of-distribution
 problems but is computationally expensive and changes the detector
 during the comparison. The generative inpainting approach can create
-more plausible masked areas for natural image classification, but it is
+more plausible masked areas for natural image classification~\cite{lindl2026inpainting, aghakishiyeva2025photorealistic}, but it is
 not considered neutral for synthetic image detection since the filler
 itself is a trained generator. Therefore, the selected algorithm prefers
 explicit operator comparison and measurable controls over one
@@ -563,6 +640,7 @@ algorithm}}{Advantages of the proposed algorithm}}\label{advantages-of-the-propo
 \end{itemize}
 
 \chapter{Experimental Setup and Implementation}
+\label{ch:setup}
 
 This chapter describes the data, the detectors, the explanation methods,
 the evaluation grid and the software that ties them together.
@@ -574,25 +652,25 @@ without an access request :
 
 \begin{itemize}
 \item
-  \textbf{ArtiFact {[}30{]}}: It is the primary dataset used in the
+  \textbf{ArtiFact~\cite{rahman2023artifact}}: It is the primary dataset used in the
   project. It provides real images from COCO, ImageNet, FFHQ, CelebA-HQ,
   LSUN, AFHQ and others and fakes images from 25 generators.
 \item
-  \textbf{ForenSynths} {[}6{]}: It provides the standard GAN test set
-  (ProGAN, StyleGAN, BigGAN, CycleGAN, StarGAN, GauGAN and a face-swap
-  subset taken from FaceForensics++).
+  \textbf{ForenSynths}~\cite{wang2020cnn}: It provides the standard GAN test set
+  (ProGAN, StyleGAN~\cite{karras2019stylegan}, BigGAN, CycleGAN, StarGAN, GauGAN and a face-swap
+  subset taken from FaceForensics++~\cite{rossler2019ffpp}).
 \item
-  \textbf{GenImage {[}29{]}}: It provides the diffusion generators such
-  as Stable Diffusion, ADM, GLIDE, VQDM, Wukong and Midjourney.
+  \textbf{GenImage~\cite{zhu2023genimage}}: It provides the diffusion generators such
+  as Stable Diffusion~\cite{rombach2022ldm}, ADM, GLIDE, VQDM, Wukong and Midjourney.
 \item
-  \textbf{CocoGlide {[}22{]}}: 512 COCO images locally inpainted with
+  \textbf{CocoGlide~\cite{guillaro2023trufor}}: 512 COCO images locally inpainted with
   GLIDE, each with a ground-truth mask.
 \end{itemize}
 
 Each image in the dataset is described by 1 row of single manifest file
 with its path, label (real or fake), generator family and split. Every
 generator name is mapped to exactly one of the six families of Section
-2.1; the mapping refuses to start if any name appears under two
+\ref{research-design-and-methodological-objective}; the mapping refuses to start if any name appears under two
 families, which helped in catching an early bug where Stable Diffusion
 had been placed under ``GAN''. Two borderline cases are worth stating:
 Diffusion-GAN and Denoising-Diffusion-GAN are placed in the GAN family
@@ -607,19 +685,30 @@ then assigned within each (generator, label) group in the ratio
 split. If one generator had train/test split unevenly, the
 cross-generator transfer matrix would leak.
 
-Table 4.1: Composition of the c2500 subset by family and split.
-
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image10.png}
     \caption{Composition of the c2500 subset by family and split.}
     \label{tab:c2500-composition}
+    \begin{tabular}{@{}lrrrrl@{}}
+        \toprule
+        \textbf{Family} & \textbf{Train} & \textbf{Val} & \textbf{Test} & \textbf{Total} & \textbf{Note} \\
+        \midrule
+        Real           & 47\,638 & 6\,806 & 14\,123 & 68\,567 & several sources \\
+        GAN            & 37\,674 & 5\,382 & 10\,764 & 53\,820 & largest fake family \\
+        Diffusion      & 21\,627 & 3\,090 &  6\,179 & 30\,896 & \\
+        Inpainting     &  7\,000 & 1\,000 &  2\,512 & 10\,512 & incl.\ 512 CocoGlide (test only) \\
+        Autoregressive &  1\,750 &    250 &     500 &  2\,500 & single generator \\
+        Face swap      &  1\,750 &    250 &     500 &  2\,500 & single generator \\
+        Rendered       &  1\,750 &    250 &     500 &  2\,500 & single generator \\
+        \midrule
+        \textbf{Total} & 119\,189 & 17\,028 & 35\,078 & 171\,295 & \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 Three out of Six types families (autoregressive, face swap and rendered)
 used only one generator for each type. Therefore, we cannot be sure that
-our results apply to every generator belonging to those types. This is
-also discussed in the limitation section of the paper.
+our results apply to every generator belonging to those types.
 
 \textbf{\section{Detectors}}
 
@@ -627,19 +716,19 @@ also discussed in the limitation section of the paper.
 
 Three backbones of similar size were chosen for the architecture :
 
-• \textbf{ResNet-50} {[}25{]} (ImageNet-1k weights from timm),
+• \textbf{ResNet-50}~\cite{he2016resnet} (ImageNet-1k weights from timm),
 2048-dimensional
 
 pooled features, as a representative CNN.
 
-• \textbf{ViT-B/16} {[}37{]} (ImageNet-21k pre-trained, ImageNet-1k
+• \textbf{ViT-B/16}~\cite{dosovitskiy2021vit} (ImageNet-21k pre-trained, ImageNet-1k
 fine-tuned,
 
 from timm), 768-dimensional class token.
 
-• \textbf{CLIP ViT-B/16} {[}27{]} (OpenAI weights via OpenCLIP), 512
+• \textbf{CLIP ViT-B/16}~\cite{radford2021clip} (OpenAI weights via OpenCLIP), 512
 dimensional image embedding. This follows the frozen-CLIP recipe of
-UnivFD {[}7{]}, which is one of the strongest cross-generator baselines.
+UnivFD~\cite{ojha2023univfd}, which is one of the strongest cross-generator baselines.
 
 All the three backbones are used at 224×224 with normalisation inside
 the model. The two ViTs have the same architecture and they differ only
@@ -649,7 +738,7 @@ in pre-training, which helps in making ViT versus CLIP comparison clean.
 
 Backbones are not fine-tuned. Features are extracted once (in fp16
 autocast on the GPU) and cached, and each detector head is an
-L2-penalised logistic regression (C = 1, balanced class weights, up to
+L2-penalised logistic regression~\cite{alain2017probes} (C = 1, balanced class weights, up to
 2000 L-BFGS iterations) on L2-normalised features.
 
 It has 3 advantage :
@@ -657,7 +746,7 @@ It has 3 advantage :
 1st, it fits the hardware, that is fitting all 13 probes for one
 backbone take seconds on CPU.
 
-2nd, it makes the controlled experiments of Section 3.6 possible, since
+2nd, it makes the controlled experiments of Section \ref{controlled-cross-generator-experiment} possible, since
 head capacity is identical across probes.
 
 Finally, the trained classifier is added back to the backbone as a
@@ -667,44 +756,52 @@ explainability methods to identify which parts of an image influenced
 the model\textquotesingle s prediction.
 
 The AUC values for validation of both the single family and the mixed
-probe are displayed in Table 4.2. The validation images are taken from
+probe are displayed in Table \ref{tab:validation-auc}. The validation images are taken from
 the families used during training and thus only evaluate the
 in-distribution performance. The rendered family is easily separated
 (AUC ≈ 1) for all backbones, while the mixed probe has lower scores than
 single family probes because it has to differentiate six types of fake
 images with one decision boundary.
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image8.png}
-    \caption{Validation AUC values for the single-family and mixed probes.}
+    \caption{Validation AUC of the probes (in-distribution). CLIP is the strongest backbone for every training set.}
     \label{tab:validation-auc}
+    \begin{tabular}{@{}lccccccc@{}}
+        \toprule
+        \textbf{Backbone} & \textbf{AR} & \textbf{Diff.} & \textbf{Face sw.} & \textbf{GAN} & \textbf{Inpaint} & \textbf{Rendered} & \textbf{Mixed} \\
+        \midrule
+        ResNet-50     & 0.936 & 0.862 & 0.994 & 0.905 & 0.924 & 1.000 & 0.830 \\
+        ViT-B/16      & 0.954 & 0.865 & 0.997 & 0.900 & 0.933 & 1.000 & 0.833 \\
+        CLIP ViT-B/16 & 0.987 & 0.931 & 0.999 & 0.970 & 0.960 & 1.000 & 0.920 \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 \textbf{\section{Explanation methods}}
 
 We evaluated 7 explainers, all producing 224 x 224 map for fake logit,
-it is normalized to {[}0,1{]}. An example of each is shown in figure 4.1
+it is normalized to {[}0,1{]}. An example of each is shown in Figure \ref{fig:saliency-maps}.
 
 \begin{itemize}
 \item
-  \textbf{Grad-CAM} {[}9{]} and \textbf{Grad-CAM}++ {[}35{]}, hooked on
+  \textbf{Grad-CAM}~\cite{selvaraju2017gradcam} and \textbf{Grad-CAM}++~\cite{chattopadhay2018gradcampp}, hooked on
   layer4 for ResNet-50 and at the input normalization of the final
   Transformer block for the two ViTs, with patch tokens reshaped into a
   14 × 14 grid.
 \item
-  \textbf{Gradient×input} {[}33{]}: absolute value of the input gradient
+  \textbf{Gradient×input}~\cite{shrikumar2017deeplift}: absolute value of the input gradient
   times the input summed up across channels.
 \item
-  \textbf{RISE} {[}10{]} with 2000 random masks (grid 8, keep
+  \textbf{RISE}~\cite{petsiuk2018rise} with 2000 random masks (grid 8, keep
   probability 0.5).
 \item
-  \textbf{LIME} {[}11{]} with 1000 samples with respect to approximately
-  64 SLIC superpixels {[}36{]}; deactived superpixels are filled with
+  \textbf{LIME}~\cite{ribeiro2016lime} with 1000 samples with respect to approximately
+  64 SLIC superpixels~\cite{achanta2012slic}; deactived superpixels are filled with
   the mean color of the image, and a ridge regression weighted by
   exponential kernel gives superpixel scores.
 \item
-  \textbf{Attention rollout} {[}38{]} (ViTs only).
+  \textbf{Attention rollout}~\cite{abnar2020rollout} (ViTs only).
 \item
   \textbf{Random}: smooth random baseline, which ΔAUC is expected to be
   close to zero, and it was so in all settings, with maximum absolute
@@ -723,17 +820,12 @@ anything. All 12 attention layers are captured for both ViT backbones.
 There is also a special token-norm explainer to have it for comparison
 purposes.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image17.png}
-    \caption{Saliency maps for the ``fake'' logit of the ViT-B/16 mixed-probe detector on a sample photograph. The methods disagree visibly, which is the reason a reliable faithfulness metric is needed in the first place.}
+    \caption{Saliency maps for the ``fake'' logit of the ViT-B/16 mixed-probe detector on a sample photograph (RISE and LIME use reduced budgets of 1\,000 masks and 500 samples for this illustration). The methods disagree visibly, which is the reason a reliable faithfulness metric is needed in the first place.}
     \label{fig:saliency-maps}
 \end{figure}
-
-Figure 4.1: Saliency maps for the ``fake'' logit of the ViT-B/16
-mixed-probe detector on a sample photograph. The methods disagree
-visibly, which is the reason a reliable faithfulness metric is needed in
-the first place.
 
 \textbf{\section{Evaluation protocol}}
 
@@ -751,14 +843,24 @@ all 13 probes. RISE and LIME, both requiring thousands of forward passes
 per image, are run only on the mixed probe. Saliency maps are calculated
 once for every (probe, family, method) pair and reused for all
 operators. One random control curve is calculated for every (probe,
-family, operator) triplet for all methods. Table 4.3 contains the size
+family, operator) triplet for all methods. Table \ref{tab:faithfulness-grid} contains the size
 of this grid.
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image11.png}
-    \caption{Size of the faithfulness evaluation grid.}
+    \caption{Size of the faithfulness grid. Each row of the result files is one (probe, family, explainer, operator) cell evaluated on 500 images.}
     \label{tab:faithfulness-grid}
+    \begin{tabular}{@{}lccccr@{}}
+        \toprule
+        \textbf{Backbone} & \textbf{Probes} & \textbf{Families} & \textbf{Explainers} & \textbf{Operators} & \textbf{Cells} \\
+        \midrule
+        ResNet-50     & 13 & 6 & 4 (+RISE, LIME on mixed) & 6 & 1\,944 \\
+        ViT-B/16      & 13 & 6 & 5 (+RISE, LIME on mixed) & 6 & 2\,412 \\
+        CLIP ViT-B/16 & 13 & 6 & 5 (+RISE, LIME on mixed) & 6 & 2\,412 \\
+        \midrule
+        \textbf{Total} & & & & & 6\,768 \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 Deletion curves, shared random controls and RISE \& LIME queries,
@@ -826,22 +928,6 @@ server that periodically reboots possible:
   resuming unless they match, thus preventing accidental confusion of
   different runs.
 \item
-  \textbf{Batched operators}. Each operator is called once per image and
-  then summed up for all 25 masking levels, as opposed to per-level
-  invocations. In the road\_linear scenario, where 40 iterations of
-  relaxation were used, per-level invocations were about three times
-  slower.
-\item
-  \textbf{Validation and self-test on synthetic data.} The set of 96
-  unit tests (all passing) checks whether each operator returns the same
-  values as those unmasked pixels had and stays in the range {[}0, 1{]},
-  whether masks are nested and correctly sized, whether metrics are
-  computed correctly, whether resume works as expected, and whether
-  manifest splitting rules are satisfied. A synthetic dataset, created
-  in such a way that its "families" have clearly distinct frequency
-  signatures, allows running the entire pipeline, including all figures,
-  in minutes without downloading any data.
-\item
   \textbf{Batching operators}. Operators are run once on an image for
   all 25 levels at once, rather than one by level; in the road\_linear
   case with its 40 iterations of relaxation, running operators by level
@@ -860,9 +946,8 @@ server that periodically reboots possible:
 
 \chapter{Results and Discussion}
 
-This chapter is a summary of the findings obtained from the original
-BTP\_Report\_preview.pdf, where the figures cited come from the
-original.
+This chapter presents and discusses the results of the experiments
+described in Chapters \ref{ch:methodology} and \ref{ch:setup}.
 
 \section{Detection Performance and Cross-Generator Generalisation}
 
@@ -886,17 +971,12 @@ These results mean that good in-family performance by the detectors does
 not always translate into being able to detect images generated by
 unseen generators.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image18.png}
+    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/transfer_heatmap.pdf}
     \caption{Detection AUC of every probe (rows) on every test family (columns). Bold numbers are families the probe never saw during training (for a leave-one-out (LOO) probe, its held-out family). The LOO block is uniformly darker than the block of single-family probes.}
     \label{fig:detection-auc}
 \end{figure}
-Figure
-5.1: Detection AUC of every probe (rows) on every test family (columns).
-Bold numbers are families the probe never saw during training (for a
-leave-one-out (LOO) probe, its held-out family). The LOO block is
-uniformly darker than the block of single-family probes.
 
 \section{Leakage of Perturbations on Genuine Images}
 
@@ -918,42 +998,43 @@ pixels from another authentic image causes a very small leakage for
 ResNet-50 (0.12) and ViT-B/16 (0.002) while causing a large leakage for
 CLIP (0.58).
 
-Table 5.1: Leakage Λ (mean rise in pfake on 500 real images over
-0--100\% random masking, mixed probe) and, in brackets, the initial
-slope (per unit of masked area, α ≤ 0.2). The largest value in each
-column is in bold.
-
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image22.png}
-    \caption{Leakage $\Lambda$ (mean rise in $p_{\mathrm{fake}}$ on 500 real images over 0--100\% random masking, mixed probe) and, in brackets, the initial slope (per unit of masked area, $lpha \leq 0.2$). The largest value in each column is in bold.}
+    \caption{Leakage $\Lambda$ (mean rise in $p_{\mathrm{fake}}$ on 500 real images over 0--100\% random masking, mixed probe) and, in brackets, the initial slope (per unit of masked area, $\alpha \leq 0.2$). The largest value in each column is in bold.}
     \label{tab:leakage-summary}
+    \begin{tabular}{@{}llrrr@{}}
+        \toprule
+        \textbf{Operator} & \textbf{Class} & \textbf{ResNet-50} & \textbf{ViT-B/16} & \textbf{CLIP ViT-B/16} \\
+        \midrule
+        zero (black)   & injecting     & \textbf{0.406} (1.58)    & 0.013 (0.00)            & 0.608 (2.80) \\
+        grey           & injecting     & 0.290 (0.40)             & 0.145 ($-$0.03)         & \textbf{0.623} (2.90) \\
+        mean colour    & injecting     & 0.246 (0.21)             & 0.143 ($-$0.02)         & 0.615 (2.91) \\
+        uniform noise  & injecting     & 0.221 ($-$0.30)          & 0.070 (0.03)            & 0.577 (2.69) \\
+        Gaussian blur  & injecting     & 0.163 (0.05)             & 0.233 (0.12)            & 0.603 (3.11) \\
+        \midrule
+        ROAD linear    & neutral cand. & 0.186 (0.24)             & 0.180 (0.37)            & 0.463 (2.06) \\
+        spectral match & neutral cand. & 0.334 (0.47)             & \textbf{0.325} (0.86)   & 0.579 (2.75) \\
+        real transplant& neutral cand. & 0.118 (0.54)             & 0.002 (0.05)            & 0.577 (3.00) \\
+        \midrule
+        \multicolumn{2}{@{}l}{Mean, injecting}      & 0.265 & 0.121 & 0.605 \\
+        \multicolumn{2}{@{}l}{Mean, neutral cand.}  & 0.213 & 0.169 & 0.540 \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image4.png}
-    \caption{Mean rise in pfake on real images as the randomly masked area grows. Solid lines are injecting operators, dashed lines are neutral candidates. CLIP's curves jump by about 0.5 at the very first masking step (4\% of the image) for every operator except ROAD imputation. The real\_transplant curves of ResNet-50 and ViT-B/16 return to zero at 100\% masking, as they should: a fully transplanted image is simply another real photograph.}
+    \caption{Mean rise in $p_{\mathrm{fake}}$ on real images as the randomly masked area grows. Solid lines are injecting operators, dashed lines are neutral candidates. CLIP's curves jump by about 0.5 at the very first masking step (4\% of the image) for every operator except ROAD imputation. The real\_transplant curves of ResNet-50 and ViT-B/16 return to zero at 100\% masking, as they should: a fully transplanted image is simply another real photograph.}
     \label{fig:leakage-curves}
 \end{figure}
 
-Figure 5.2: Mean rise in pfake on real images as the randomly masked
-area grows. Solid lines are injecting operators, dashed lines are
-neutral candidates. CLIP's curves jump by about 0.5 at the very first
-masking step (4\% of the image) for every operator except ROAD
-imputation. The real\_transplant curves of ResNet-50 and ViT-B/16 return
-to zero at 100\% masking, as they should: a fully transplanted image is
-simply another real photograph
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image9.png}
     \caption{Leakage $\Lambda$ by operator and detector. Bars above the dotted line are injecting operators; bars below are the neutral candidates.}
     \label{fig:leakage-by-operator}
 \end{figure}
-
-Figure 5.3: Leakage Λ by operator and detector. Bars above the dotted
-line are injecting operators; bars below are the neutral candidates.
 
 \section{Effect of Perturbation Operator on Explanation Reliability}
 
@@ -972,42 +1053,39 @@ worst under another.
 
 On the other hand, LIME holds a top spot or near-top in all settings
 examined. The aforementioned result is similar to the findings of Tsigos
-et al., though it should be noted that this report mentions the fact
+et al.~\cite{tsigos2024towards, tsigos2025improving}, though it should be noted that this report mentions the fact
 that LIME may perform better due to similarities between perturbation
 and metric measures.
 
 All in all, it appears that ranking based on a single fill operator does
 not provide a complete picture of explanation reliability.
 
-Table 5.2: Stability of the method ranking across the six operators
-(mixed probe). Spearman ρ is computed between the method rankings of
-every pair of operators (15 pairs).
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image19.png}
-    \caption{Stability of the method ranking across the six operators (mixed probe). Spearman $
-ho$ is computed between the method rankings of every pair of operators (15 pairs).}
+    \caption{Stability of the method ranking across the six operators (mixed probe). Spearman $\rho$ is computed between the method rankings of every pair of operators (15 pairs).}
     \label{tab:ranking-stability}
+    \begin{tabular}{@{}lccc@{}}
+        \toprule
+         & \textbf{ResNet-50} & \textbf{ViT-B/16} & \textbf{CLIP ViT-B/16} \\
+        \midrule
+        Methods compared                        & 6               & 7              & 7 \\
+        Lowest pairwise Spearman $\rho$         & 0.43            & $-$0.29        & 0.04 \\
+        \quad(operator pair)                    & zero vs ROAD    & zero vs blur   & grey vs ROAD \\
+        Mean pairwise Spearman $\rho$           & 0.73            & 0.41           & 0.43 \\
+        Rank range of LIME (best--worst)        & 1--2            & 1--2           & 1--3 \\
+        Rank range of gradient$\times$input     & 1--5            & 1--7           & 1--7 \\
+        Max.\ methods below the random control  & 1               & 4              & 2 \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image13.png}
-    \caption{Explanation reliability results.}
-    \label{fig:image13}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image5.png}
+    \includegraphics[width=0.675\textwidth]{media/image13.png}\\[4pt]
+    \includegraphics[width=0.85\textwidth]{media/image5.png}
     \caption{Mean $\Delta$AUC (higher is more faithful) of each explanation method under each operator, mixed probe, averaged over the six test families; the rank among methods under that operator is in brackets. Blue cells are methods that do worse than random deletion.}
     \label{fig:mean-delta-auc}
 \end{figure}
-Figure
-5.4: Mean ∆AUC (higher is more faithful) of each explanation method
-under each operator, mixed probe, averaged over the six test families;
-the rank among methods under that operator is in brackets. Blue cells
-are methods that do worse than random deletion.
 
 \section{Effect of Diversity in Training Set}
 
@@ -1023,32 +1101,36 @@ improved detection performance. A serious disadvantage in this
 experiment is that there is a larger number of fake images in a diverse
 training set.
 
-Table 5.3: Effect of training diversity on unseen families: mean of
-δm(A, F) over 30 pairs, with the share of pairs where the LOO probe is
-better. The first column is detection AUC; the others are ∆AUC under
-each operator. ∗ : p \textless{} 0.05 in a one-sample t-test (the 30
-pairs share probes, so these p-values are optimistic).
-
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image14.png}
-    \caption{Effect of training diversity on unseen families: mean of $\delta_m(A,F)$ over 30 pairs, with the share of pairs where the LOO probe is better. The first column is detection AUC; the others are $\Delta$AUC under each operator.}
+    \caption{Effect of training diversity on unseen families: mean of $\delta_m(A,F)$ over 30 pairs, with the share of pairs where the LOO probe is better. The first column is detection AUC; the others are $\Delta$AUC under each operator. $\ast$: $p < 0.05$ in a one-sample t-test (the 30 pairs share probes, so these p-values are optimistic).}
     \label{tab:training-diversity}
+    \small
+    \begin{tabular}{@{}lccccccc@{}}
+        \toprule
+        \textbf{Backbone} & \textbf{Det.\ AUC} & \textbf{zero} & \textbf{grey} & \textbf{blur} & \textbf{ROAD} & \textbf{spectral} & \textbf{transplant} \\
+        \midrule
+        ResNet-50     & $+0.042$ & $+0.121^{\ast}$ & $+0.078^{\ast}$ & $+0.004$ & $+0.055^{\ast}$ & $+0.032^{\ast}$ & $+0.086^{\ast}$ \\
+                      & {\scriptsize 70\%} & {\scriptsize 67\%} & {\scriptsize 67\%} & {\scriptsize 53\%} & {\scriptsize 77\%} & {\scriptsize 57\%} & {\scriptsize 73\%} \\
+        \addlinespace
+        ViT-B/16      & $+0.047$ & $+0.008$ & $+0.032^{\ast}$ & $-0.005$ & $+0.006$ & $+0.012^{\ast}$ & $+0.020^{\ast}$ \\
+                      & {\scriptsize 77\%} & {\scriptsize 70\%} & {\scriptsize 90\%} & {\scriptsize 43\%} & {\scriptsize 57\%} & {\scriptsize 70\%} & {\scriptsize 93\%} \\
+        \addlinespace
+        CLIP ViT-B/16 & $+0.053$ & $+0.013$ & $+0.009$ & $-0.022^{\ast}$ & $-0.006$ & $+0.009^{\ast}$ & $+0.017^{\ast}$ \\
+                      & {\scriptsize 87\%} & {\scriptsize 73\%} & {\scriptsize 67\%} & {\scriptsize 40\%} & {\scriptsize 40\%} & {\scriptsize 63\%} & {\scriptsize 73\%} \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
-Figure 5.5: Leave-one-out minus single-family probe on the same held-out
-family (mean ± standard error over 30 pairs). Left of the dotted line:
-detection AUC. Right: ∆AUC under each operator.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image1.png}
-    \caption{Classification performance and explanation reliability results.}
-    \label{fig:image1}
+    \caption{Leave-one-out minus single-family probe on the same held-out family (mean $\pm$ standard error over 30 pairs). Left of the dotted line: detection AUC. Right: $\Delta$AUC under each operator.}
+    \label{fig:loo-minus-single}
 \end{figure}
 
-5.5 Connection between Classification Performance and Explanation
-Reliability
+\section{Connection between Classification Performance and Explanation
+Reliability}
 
 Moreover, this paper considers if there is a direct connection between
 classification accuracy of the detector and explanation reliability. It
@@ -1060,37 +1142,35 @@ detection AUC and mean ΔAUC for various backbones and test scenarios.
 All this illustrates the difference between detection performance and
 explanation reliability.
 
-Table 5.4: Spearman ρ between detection AUC and mean ∆AUC over 78
-(probe, family) cells per backbone. ∗ : p \textless{} 0.05; cells share
-probes and families, so the p-values are optimistic.
-
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image3.png}
-    \caption{Spearman $
-ho$ between detection AUC and mean $\Delta$AUC over 78 (probe, family) cells per backbone. $\ast$: $p < 0.05$; cells share probes and families, so the p-values are optimistic.}
+    \caption{Spearman $\rho$ between detection AUC and mean $\Delta$AUC over 78 (probe, family) cells per backbone. $\ast$: $p < 0.05$; cells share probes and families, so the p-values are optimistic.}
     \label{tab:auc-faithfulness-correlation}
+    \begin{tabular}{@{}lcccccc@{}}
+        \toprule
+        \textbf{Backbone} & \textbf{zero} & \textbf{grey} & \textbf{blur} & \textbf{ROAD} & \textbf{spectral} & \textbf{transplant} \\
+        \midrule
+        ResNet-50     & $-0.01$ & $-0.03$ & $+0.16$ & $+0.41^{\ast}$ & $-0.21$ & $+0.06$ \\
+        ViT-B/16      & $+0.09$ & $+0.18$ & $+0.22$ & $+0.27^{\ast}$ & $-0.01$ & $+0.16$ \\
+        CLIP ViT-B/16 & $+0.19$ & $+0.09$ & $-0.26^{\ast}$ & $-0.13$ & $-0.06$ & $+0.09$ \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{media/image6.png}
     \caption{Detection AUC against mean $\Delta$AUC for the 78 ResNet-50 cells, under ROAD imputation (left) and black fill (right). The same detectors and the same explanations give a clear positive relation under one operator and none under the other.}
     \label{fig:detection-vs-faithfulness}
 \end{figure}
 
-Figure 5.6: Detection AUC against mean ∆AUC for the 78 ResNet-50 cells,
-under ROAD imputation (left) and black fill (right). The same detectors
-and the same explanations give a clear positive relation under one
-operator and none under the other.
-
 \section{Results from Anti-Faithful Saliency}
 
-The original report gives an analysis of the cases when the elimination
-of salient areas does not produce the expected decrease in the detection
-accuracy. This information needs to be taken into account with caution.
-According to the original report, there is a possible interaction
-between the replacement operator and selected by explanation regions.
+In some cases, the elimination of salient areas does not produce the
+expected decrease in the detection accuracy. This information needs to
+be taken into account with caution. There is a possible interaction
+between the replacement operator and the regions selected by the
+explanation.
 Even though the correction for leakage reduces the average effect of the
 operator, it does not exclude the interaction of the operator with the
 selected regions.
@@ -1107,240 +1187,3 @@ perturbation depends on the detector and replacement technique selected.
 Fourthly, the rankings for the different explanation methods change
 depending on the fill operation selected. Fifthly, good performance in
 terms of detection does not guarantee faithfulness in the explanation.
-
-\chapter*{References}\addcontentsline{toc}{chapter}{References}
-
-{[}1{]} I. Goodfellow, J. Pouget-Abadie, M. Mirza, et al., ``Generative
-adversarial nets,'' in Advances in Neural Information Processing Systems
-(NeurIPS), 2014.
-
-{[}2{]} T. Karras, S. Laine, and T. Aila, ``A style-based generator
-architecture for generative adversarial networks,'' in Proceedings of
-the IEEE/CVF Conference on Computer Vision and Pattern Recognition
-(CVPR), 2019.
-
-{[}3{]} J. Ho, A. Jain, and P. Abbeel, ``Denoising diffusion
-probabilistic models,'' in Advances in Neural Information Processing
-Systems (NeurIPS), 2020.
-
-{[}4{]} R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer,
-``High-resolution image synthesis with latent diffusion models,'' in
-Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
-Recognition (CVPR), 2022.
-
-{[}5{]} P. Esser, R. Rombach, and B. Ommer, ``Taming transformers for
-high-resolution image synthesis,'' in Proceedings of the IEEE/CVF
-Conference on Computer Vision and Pattern Recognition (CVPR), 2021.
-
-{[}6{]} S.-Y. Wang, O. Wang, R. Zhang, A. Owens, and A. A. Efros,
-``CNN-generated images are surprisingly easy to spot\ldots for now,'' in
-Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
-Recognition (CVPR), 2020, pp. 8695--8704.
-
-{[}7{]} U. Ojha, Y. Li, and Y. J. Lee, ``Towards universal fake image
-detectors that generalize across generative models,'' in Proceedings of
-the IEEE/CVF Conference on Computer Vision and Pattern Recognition
-(CVPR), 2023, pp. 24 480--24 489.
-
-{[}8{]} R. Corvi, D. Cozzolino, G. Zingarini, G. Poggi, K. Nagano, and
-L. Verdoliva, ``On the detection of synthetic images generated by
-diffusion models,'' in IEEE International Conference on Acoustics,
-Speech and Signal Processing (ICASSP), 2023.
-
-{[}9{]} R. R. Selvaraju, M. Cogswell, A. Das, R. Vedantam, D. Parikh,
-and D. Batra, ``Grad-CAM: Visual explanations from deep networks via
-gradient-based localization,'' in Proceedings of the IEEE International
-Conference on Computer Vision (ICCV), 2017, pp. 618--626.
-
-{[}10{]} V. Petsiuk, A. Das, and K. Saenko, ``RISE: Randomized input
-sampling for explanation of black-box models,'' in Proceedings of the
-British Machine Vision Conference (BMVC), 2018.
-
-{[}11{]} M. T. Ribeiro, S. Singh, and C. Guestrin, ``\,``why should I
-trust you?'': Explaining the predictions of any classifier,'' in
-Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge
-Discovery and Data Mining, 2016, pp. 1135--1144.
-
-{[}12{]} W. Samek, A. Binder, G. Montavon, S. Lapuschkin, and K.-R.
-Müller, ``Evaluating the visualization of what a deep neural network has
-learned,'' IEEE Transactions on Neural Networks and Learning Systems,
-vol. 28, no. 11, pp. 2660--2673, 2017.
-
-{[}13{]} S. Hooker, D. Erhan, P.-J. Kindermans, and B. Kim, ``A
-benchmark for interpretability methods in deep neural networks,'' in
-Advances in Neural Information Processing Systems (NeurIPS), 2019.
-
-{[}14{]} Y. Rong, T. Leemann, V. Borisov, G. Kasneci, and E. Kasneci,
-``A consistent and efficient evaluation strategy for attribution
-methods,'' in Proceedings of the 39th International Conference on
-Machine Learning (ICML), 2022.
-
-{[}15{]} A. Hedström, L. Weber, D. Krakowczyk, et al., ``Quantus: An
-explainable AI toolkit for responsible evaluation of neural network
-explanations and beyond,'' Journal of Machine Learning Research, vol.
-24, no. 34, pp. 1--11, 2023.
-
-{[}16{]} J. Frank, T. Eisenhofer, L. Schönherr, A. Fischer, D. Kolossa,
-and T. Holz, ``Leveraging frequency analysis for deep fake image
-recognition,'' in Proceedings of the 37th International Conference on
-Machine Learning (ICML), 2020.
-
-{[}17{]} R. Durall, M. Keuper, and J. Keuper, ``Watch your
-up-convolution: CNN based generative deep neural networks are failing to
-reproduce spectral distributions,'' in Proceedings of the IEEE/CVF
-Conference on Computer Vision and Pattern Recognition (CVPR), 2020.
-
-{[}18{]} X. Zhang, S. Karaman, and S.-F. Chang, ``Detecting and
-simulating artifacts in GAN fake images,'' in IEEE International
-Workshop on Information Forensics and Security (WIFS), 2019.
-
-{[}19{]} K. Tsigos, E. Apostolidis, S. Baxevanakis, S. Papadopoulos, and
-V. Mezaris, ``Towards quantitative evaluation of explainable AI methods
-for deepfake detection,'' in Proceedings of the 3rd ACM International
-Workshop on Multimedia AI against Disinformation (MAD '24), held with
-ACM ICMR 2024, 2024. doi: 10.1145/3643491.3660292.
-
-{[}20{]} M. A. Biswas, The calibrated deepfake trust score (CDTS):
-Competence-coupled trust degradation across deepfake detectors, arXiv
-preprint arXiv:2606.29484, 2026.
-
-{[}21{]} R. Suvorov, E. Logacheva, A. Mashikhin, et al.,
-``Resolution-robust large mask inpainting with fourier convolutions,''
-in Proceedings of the IEEE/CVF Winter Conference on Applications of
-Computer Vision (WACV), 2022.
-
-{[}22{]} F. Guillaro, D. Cozzolino, A. Sud, N. Dufour, and L. Verdoliva,
-``TruFor: Leveraging all-round clues for trustworthy image forgery
-detection and localization,'' in Proceedings of the IEEE/CVF Conference
-on Computer Vision and Pattern Recognition (CVPR), 2023.
-
-{[}23{]} A. Rössler, D. Cozzolino, L. Verdoliva, C. Riess, J. Thies, and
-M. Nießner, ``FaceForensics++: Learning to detect manipulated facial
-images,'' in Proceedings of the IEEE/CVF International Conference on
-Computer Vision (ICCV), 2019.
-
-{[}24{]} E. Wood, T. Baltrušaitis, C. Hewitt, S. Dziadzio, T. J.
-Cashman, and J. Shotton, ``Fake it till you make it: Face analysis in
-the wild using synthetic data alone,'' in Proceedings of the IEEE/CVF
-International Conference on Computer Vision (ICCV), 2021.
-
-{[}25{]} K. He, X. Zhang, S. Ren, and J. Sun, ``Deep residual learning
-for image recognition,'' in Proceedings of the IEEE Conference on
-Computer Vision and Pattern Recognition (CVPR), 2016, pp. 770--778.
-
-{[}26{]} Z. Wang, J. Bao, W. Zhou, et al., ``DIRE for
-diffusion-generated image detection,'' in Proceedings of the IEEE/CVF
-International Conference on Computer Vision (ICCV), 2023.
-
-{[}27{]} A. Radford, J. W. Kim, C. Hallacy, et al., ``Learning
-transferable visual models from natural language supervision,'' in
-Proceedings of the 38th International Conference on Machine Learning
-(ICML), 2021.
-
-{[}28{]} G. Alain and Y. Bengio, ``Understanding intermediate layers
-using linear classifier probes,'' in ICLR Workshop Track, 2017.
-
-{[}29{]} M. Zhu, H. Chen, Q. Yan, et al., ``GenImage: A million-scale
-benchmark for detecting AI-generated image,'' in Advances in Neural
-Information Processing Systems (NeurIPS), Datasets and Benchmarks Track,
-2023.
-
-{[}30{]} M. A. Rahman, B. Paul, N. H. Sarker, Z. I. A. Hakim, and S. A.
-Fattah, ``ArtiFact: A large-scale dataset with artificial and factual
-images for generalizable and robust synthetic image detection,'' in IEEE
-International Conference on Image Processing (ICIP), 2023.
-
-{[}31{]} Z. Yan, Y. Zhang, X. Yuan, S. Lyu, and B. Wu, ``DeepfakeBench:
-A comprehensive benchmark of deepfake detection,'' in Advances in Neural
-Information Processing Systems (NeurIPS), Datasets and Benchmarks Track,
-2023.
-
-{[}32{]} K. Simonyan, A. Vedaldi, and A. Zisserman, ``Deep inside
-convolutional networks: Visualising image classification models and
-saliency maps,'' in ICLR Workshop Track, 2014.
-
-{[}33{]} A. Shrikumar, P. Greenside, and A. Kundaje, ``Learning
-important features through propagating activation differences,'' in
-Proceedings of the 34th International Conference on Machine Learning
-(ICML), 2017.
-
-{[}34{]} M. Sundararajan, A. Taly, and Q. Yan, ``Axiomatic attribution
-for deep networks,'' in Proceedings of the 34th International Conference
-on Machine Learning (ICML), 2017.
-
-{[}35{]} A. Chattopadhay, A. Sarkar, P. Howlader, and V. N.
-Balasubramanian, ``Grad-CAM++: Generalized gradient-based visual
-explanations for deep convolutional networks,'' in IEEE Winter
-Conference on Applications of Computer Vision (WACV), 2018, pp.
-839--847.
-
-{[}36{]} R. Achanta, A. Shaji, K. Smith, A. Lucchi, P. Fua, and S.
-Süsstrunk, ``SLIC superpixels compared to state-of-the-art superpixel
-methods,'' 11, vol. 34, 2012, pp. 2274--2282.
-
-{[}37{]} A. Dosovitskiy, A. Beyer, A. Kolesnikov, et al., ``An image is
-worth 16x16 words: Transformers for image recognition at scale,'' in
-International Conference on Learning Representations (ICLR), 2021.
-
-{[}38{]} S. Abnar and W. Zuidema, ``Quantifying attention flow in
-transformers,'' in Proceedings of the 58th Annual Meeting of the
-Association for Computational Linguistics (ACL), 2020, pp. 4190--4197.
-
-{[}39{]} J. Adebayo, J. Gilmer, M. Muelly, I. Goodfellow, M. Hardt, and
-B. Kim, ``Sanity checks for saliency maps,'' in Advances in Neural
-Information Processing Systems (NeurIPS), 2018.
-
-{[}40{]} R. Tomsett, D. Harborne, S. Chakraborty, P. Gurram, and A.
-Preece, ``Sanity checks for saliency metrics,'' in Proceedings of the
-AAAI Conference on Artificial Intelligence, 2020.
-
-{[}41{]} C.-H. Chang, E. Creager, A. Goldenberg, and D. Duvenaud,
-``Explaining image classifiers by counterfactual generation,'' in
-International Conference on Learning Representations (ICLR), 2019.
-
-{[}42{]} C. Agarwal and A. Nguyen, ``Explaining image classifiers by
-removing input features using generative models,'' in Proceedings of the
-Asian Conference on Computer Vision (ACCV), 2020.
-
-{[}43{]} G. Aghakishiyeva, J. Zhou, S. Arya, et al., Photorealistic
-inpainting for perturbation-based explanations in ecological monitoring,
-arXiv preprint arXiv:2510.03317, 2025.
-
-{[}44{]} J. Lindl, M. Chaves, and D. Garreau, Inpainting insights:
-Elevating visual XAI with photorealistic perturbations, arXiv preprint
-arXiv:2607.15482, 2026.
-
-{[}45{]} K. Tsigos, E. Apostolidis, and V. Mezaris, ``Improving the
-perturbation-based explanation of deepfake detectors through the use of
-adversarially-generated samples,'' in Proceedings of the IEEE/CVF Winter
-Conference on Applications of Computer Vision Workshops (AI4MFDD),
-arXiv:2502.03957, 2025.
-
-\chapter*{Bibliography}\addcontentsline{toc}{chapter}{Bibliography}
-
-{[}46{]} Y. Mirsky and W. Lee, ``The creation and detection of
-deepfakes: A survey,'' ACM Computing Surveys, vol. 54, no. 1, pp. 1--41,
-2021.
-
-{[}47{]} R. Tolosana, R. Vera-Rodriguez, J. Fierrez, A. Morales, and J.
-Ortega-Garcia, ``Deepfakes and beyond: A survey of face manipulation and
-fake detection,'' Information Fusion, vol. 64, pp. 131--148, 2020.
-
-{[}48{]} S. Bach, A. Binder, G. Montavon, F. Klauschen, K.-R. Müller,
-and W. Samek, ``On pixel-wise explanations for non-linear classifier
-decisions by layer-wise relevance propagation,'' PLoS ONE, vol. 10, no.
-7, e0130140, 2015.
-
-{[}49{]} F. Pedregosa et al., ``Scikit-learn: Machine learning in
-Python,'' Journal of Machine Learning Research, vol. 12, pp. 2825--2830,
-2011.
-
-{[}50{]} A. Paszke et al., ``PyTorch: An imperative style,
-high-performance deep learning library,'' in Advances in Neural
-Information Processing Systems (NeurIPS), 2019.
-
-{[}51{]} R. Wightman, PyTorch image models,
-https://github.com/huggingface/pytorch-image-models, 2019.
-
-{[}52{]} G. Ilharco, M. Wortsman, R. Wightman, et al., OpenCLIP, Zenodo,
-2021. doi: 10.5281/zenodo.5143773.

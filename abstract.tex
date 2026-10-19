@@ -11,10 +11,10 @@ mask edges, flat grey patches and white noise are exactly the kind of
 low-level artifacts a forgery detector is trained to notice, so the measuring
 instrument may itself produce the signal it is supposed to measure.
 
-To test this, I designed a \emph{leakage null test} that needs no explanation
+To test this, we designed a \emph{leakage null test} that needs no explanation
 method at all: random regions of genuinely real photographs are masked and
 filled, and any rise in the detector's probability of ``fake'' is attributed to
-the operator. I ran this test, together with a leakage-corrected faithfulness
+the operator. We ran this test, together with a leakage-corrected faithfulness
 score ($\Delta$AUC, salient deletion measured against a random-deletion
 control), on three frozen backbones (ResNet-50, ViT-B/16 and CLIP ViT-B/16)
 with logistic-regression heads, about 171\,000 images from roughly forty
