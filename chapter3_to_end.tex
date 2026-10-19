@@ -1187,3 +1187,206 @@ perturbation depends on the detector and replacement technique selected.
 Fourthly, the rankings for the different explanation methods change
 depending on the fill operation selected. Fifthly, good performance in
 terms of detection does not guarantee faithfulness in the explanation.
+
+
+
+\chapter{Conclusion and Future Work}
+
+\section{Limitations of the Current Findings}
+
+The findings presented in Chapter 5 were obtained through the first
+successful experimental run. Several design decisions impose
+limitations on the extent to which these findings can be generalized.
+
+\begin{enumerate}
+    \item \textbf{Sample of the dataset.}
+    Only 2,500 images per generator were used, representing
+    approximately 171,000 images out of roughly 3.5 million images
+    available across the four datasets. Neither the probes nor the
+    faithfulness grid has been evaluated on the complete datasets.
+
+    \item \textbf{Narrow generator families.}
+    Autoregressive, face-swap, and rendered images are each represented
+    by only one generator. Consequently, the findings for these
+    families may be specific to the individual generators evaluated.
+
+    \item \textbf{Leakage measured on one probe.}
+    The leakage experiment was performed only on the mixed probe of
+    each backbone. Leakage for single-family and leave-one-out (LOO)
+    probes, as well as leakage broken down by generator family, remains
+    to be investigated.
+
+    \item \textbf{RISE and LIME evaluated on one probe.}
+    Due to their computational cost, which reached approximately four
+    GPU-hours per family on ViT-B/16, RISE and LIME were evaluated only
+    on the mixed probe. Consequently, method rankings are based on six
+    test families for one probe per backbone.
+
+    \item \textbf{Absence of confidence intervals for rankings.}
+    Rank correlations calculated over six or seven explanation methods
+    can be noisy. Bootstrap confidence intervals have not yet been
+    computed. Furthermore, the p-values used in the diversity and
+    competence analyses treat overlapping experimental cells as
+    independent, potentially making the statistical evidence appear
+    stronger than it is.
+
+    \item \textbf{Confounding of diversity and dataset size.}
+    LOO probes contain more fake images than single-family probes,
+    as described in Section 3.6. Therefore, the effect of generator
+    diversity cannot be completely separated from the effect of
+    training-set size.
+
+    \item \textbf{Operator--region interaction.}
+    The $\Delta$AUC correction removes the average effect of the
+    replacement operator but does not account for interactions between
+    the operator and the specific regions selected by an explanation.
+    Therefore, the anti-faithful saliency results discussed in
+    Section 5.6 cannot yet be interpreted conclusively.
+
+    \item \textbf{Saturated flip rate.}
+    The current definition of flip rate does not sufficiently
+    distinguish the effects of different replacement operators.
+
+    \item \textbf{Linear probes only.}
+    All evaluated detectors use frozen backbones with linear
+    classification heads. End-to-end trained detectors may respond
+    differently to replacement operators, although the leakage test
+    itself can also be applied to these models.
+\end{enumerate}
+
+\section{Conclusion}
+
+This project set out to evaluate explanations of deepfake detectors
+and ultimately examined the reliability of the evaluation process
+itself. The central observation is that a deletion-based faithfulness
+metric requires a replacement operator, and for a forgery detector,
+the artifacts introduced by this operator may resemble evidence of
+manipulation. The leakage null test provides a quantitative way to
+measure this effect for any detector--operator pair without requiring
+an explanation method.
+
+The experiments were conducted using three frozen backbones and
+approximately 171,000 images from six generator families. The results
+confirmed that perturbation leakage is a significant concern. Every
+detector had at least one commonly used operator that increased the
+predicted probability of an image being fake by more than 0.2 on real
+images. For CLIP, every evaluated operator produced an increase
+greater than 0.45.
+
+The results also demonstrated that an operator that performs
+reasonably well for one detector may be unsuitable for another.
+Black fill was relatively harmless for ViT-B/16 but was the worst
+choice for ResNet-50. Among the three operators investigated as
+potentially neutral alternatives, transplanting pixels from another
+real photograph performed well for ResNet-50 and ViT-B/16, whereas
+spectral matching did not provide the expected neutrality. None of
+these alternatives was consistently neutral for CLIP.
+
+The choice of replacement operator also affected the conclusions
+drawn from faithfulness experiments. It changed the ranking of
+explanation methods, influenced whether training diversity appeared
+to improve faithfulness, and affected the observed relationship
+between detection performance and explanation reliability. On
+ViT-B/16, the rank correlation between two operators was as low as
+$-0.29$. LIME remained near the top across the evaluated operators,
+supporting the earlier findings of Tsigos et al., although its
+similarity to the perturbation-based evaluation procedure may partly
+favour its performance.
+
+Another important observation was that CLIP, the strongest detector
+in terms of classification performance, produced the least faithful
+explanations. Similarly, the improvement in detection performance
+obtained through greater training-set diversity did not translate
+into a consistent improvement in explanation faithfulness.
+
+Overall, the findings show that detection performance and explanation
+reliability must be evaluated separately. Faithfulness scores for
+forensic deepfake detectors should not be reported in isolation.
+They should be compared against an appropriate random-deletion
+control, evaluated under multiple replacement operators, and
+accompanied by measurements of the leakage introduced by each
+operator.
+
+\section{Plan for Phase II}
+
+The second phase will address the limitations identified in the
+current experiments. The planned work is ordered to strengthen the
+existing findings before extending the evaluation framework.
+
+\begin{enumerate}
+
+    \item \textbf{Complete the leakage analysis.}
+    Run the leakage null test for all 13 probes per backbone and
+
+    report leakage separately for each training family.
+
+
+    \item \textbf{Improve statistical evaluation.}
+    Compute bootstrap confidence intervals for $\Delta$AUC,
+
+    explanation-method rankings, and rank correlations. Use
+
+    mixed-effects or permutation tests that account for the shared
+
+    structure of experimental cells. Redefine flip rate using a
+
+    fixed, small masked area.
+
+
+    \item \textbf{Introduce matched-region controls.}
+
+    Develop a random-deletion control whose regions match salient
+    regions in texture, frequency content, and spatial position.
+
+    This will help distinguish genuine anti-faithfulness from
+
+    interactions between the replacement operator and selected regions.
+
+
+    \item \textbf{Control training-set size.}
+
+    Subsample LOO probes so that they contain the same number of fake
+    images as single-family probes. This will help separate the effect
+
+    of generator diversity from the effect of training-data quantity.
+
+
+    \item \textbf{Investigate explainer--metric alignment.}
+
+    Rerun LIME and RISE using internal replacement operations that
+
+    differ from the operator used for evaluation. This will test
+
+    whether their strong rankings are partly caused by similarities
+
+    between the explanation method and the evaluation metric.
+
+
+    \item \textbf{Develop better replacement operators.}
+
+    Investigate luminance-only replacement and patch-local spectral
+    matching. For CLIP, test the semantic hypothesis by comparing
+
+    transplants placed in context with those placed out of context.
+
+    \item \textbf{Evaluate explanation plausibility.}
+
+    Use pointing-game and intersection-over-union (IoU) scores with
+    the COCOGlide ground-truth masks. This will help distinguish
+
+    faithfulness, which concerns the evidence used by the model,
+
+    from plausibility, which concerns correspondence with the
+    manipulated regions. The localisation code is already available.
+
+    \item \textbf{Test robustness and scale.}
+    Include diffusion-inpainting fill as a deliberately poor
+    reference condition, conduct JPEG compression and resizing
+    ablations, and extend the experiments to the full datasets now
+    that GPU access is available.
+
+    \item \textbf{Disseminate the results.}
+    Prepare a research paper for submission to the ACM MAD workshop
+    at ICMR or IEEE WIFS, and publicly release the project codebase.
+\end{enumerate}
+
