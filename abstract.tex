@@ -1,0 +1,43 @@
+Explanation methods such as Grad-CAM, RISE and LIME are increasingly attached
+to deepfake detectors so that a forensic analyst can see \emph{why} an image was
+flagged as synthetic. Whether those explanations can be trusted is usually
+judged with perturbation-based faithfulness metrics: the pixels an explanation
+marks as important are deleted, and a faithful explanation should make the
+detector's score fall quickly. The metric, however, does not say what to put
+in place of the deleted pixels. That choice is left to a \emph{fill operator}
+(black, grey, blur, noise and so on). This project starts from the observation
+that, for a forgery detector, the fill operator is not a harmless detail. Hard
+mask edges, flat grey patches and white noise are exactly the kind of
+low-level artifacts a forgery detector is trained to notice, so the measuring
+instrument may itself produce the signal it is supposed to measure.
+
+To test this, I designed a \emph{leakage null test} that needs no explanation
+method at all: random regions of genuinely real photographs are masked and
+filled, and any rise in the detector's probability of ``fake'' is attributed to
+the operator. I ran this test, together with a leakage-corrected faithfulness
+score ($\Delta$AUC, salient deletion measured against a random-deletion
+control), on three frozen backbones (ResNet-50, ViT-B/16 and CLIP ViT-B/16)
+with logistic-regression heads, about 171\,000 images from roughly forty
+generators grouped into six families, eight fill operators and seven
+explanation methods.
+
+The results show that the instrument leaks heavily. Random masking of real
+images raises CLIP's mean probability of ``fake'' by up to 0.62 under grey
+fill, and every detector has at least one standard operator with leakage above
+0.2. No operator is neutral for all detectors: transplanting pixels from
+another real photograph is nearly leak-free on ResNet-50 (0.12) and ViT-B/16
+(0.002), but still leaks 0.58 on CLIP. The fill operator also reorders
+explanation methods: on ViT-B/16 the rank correlation between two operators
+drops to $-0.29$, and gradient$\times$input moves from first to last place.
+LIME stays at or near the top in every setting, so the main conclusion of
+earlier work survives, but full method rankings measured with a single
+operator do not. Finally, in a controlled experiment where only the generator
+diversity of the training set is changed, diversity consistently improves
+detection AUC on unseen families (+0.04 to +0.05), while the change in
+faithfulness depends strongly on the operator, and faithfulness does not track
+detection accuracy in general. These findings argue that faithfulness numbers
+for forensic detectors should always be reported together with the leakage of
+the operator used to compute them.
+
+\vspace{0.5cm}
+
